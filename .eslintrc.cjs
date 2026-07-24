@@ -8,7 +8,7 @@ module.exports = {
     'plugin:security/recommended-legacy',
     'plugin:no-unsanitized/recommended-legacy',
   ],
-  ignorePatterns: ['dist', '.eslintrc.cjs', 'functions'],
+  ignorePatterns: ['dist', '.eslintrc.cjs', 'functions', 'mcp'],
   parser: '@typescript-eslint/parser',
   plugins: ['react-refresh', 'no-secrets'],
   rules: {
@@ -27,6 +27,16 @@ module.exports = {
       files: ['**/*.test.ts', '**/*.test.tsx'],
       rules: {
         // Test fixtures resolve paths via path.resolve/__dirname, not user input.
+        'security/detect-non-literal-fs-filename': 'off',
+      },
+    },
+    {
+      files: ['vite.config.ts'],
+      rules: {
+        // serveKuromojiDictRaw() reads req.url, but only after it's matched
+        // against an anchored `^/dict/[\w.-]+\.dat\.gz$` regex (no `/`, `..`,
+        // or other path-traversal characters allowed), so the derived path
+        // can't escape the public/dist dict directory.
         'security/detect-non-literal-fs-filename': 'off',
       },
     },
