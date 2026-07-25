@@ -2,7 +2,7 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
-  getFirestore,
+  initializeFirestore,
   doc,
   getDoc,
   collection,
@@ -20,6 +20,7 @@ import {
   serverTimestamp,
   Timestamp,
   writeBatch,
+  type Firestore,
 } from 'firebase/firestore';
 import type { TripRepository } from './TripRepository';
 import type {
@@ -50,9 +51,25 @@ function ensureApp() {
   return getApps()[0];
 }
 
-function getDb() {
-  ensureApp();
-  return getFirestore();
+let dbInstance: Firestore | undefined;
+
+// Every add/update method below spreads a caller-supplied object (e.g. a
+// Checkpoint's optional `endTime`/`location`/`notes`/`websiteUrl`/`tags`)
+// straight into addDoc/updateDoc. Those fields are routinely `undefined`
+// when empty, and Firestore's default Firestore instance throws
+// "Unsupported field value: undefined" for that rather than just omitting
+// the key — ignoreUndefinedProperties makes it omit instead, matching how
+// LocalTripRepository's plain-object/JSON.stringify storage already
+// behaves. Memoized because initializeFirestore can only be called once
+// per app; getDb() must be the first thing to touch Firestore on this app
+// (see firebaseAuthService.ts, which imports and reuses this same
+// instance rather than calling getFirestore() itself).
+export function getDb(): Firestore {
+  const app = ensureApp();
+  if (!dbInstance) {
+    dbInstance = initializeFirestore(app, { ignoreUndefinedProperties: true });
+  }
+  return dbInstance;
 }
 
 function toIso(val: unknown): string {

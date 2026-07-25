@@ -7,17 +7,15 @@ import {
   onAuthStateChanged as fbOnAuthStateChanged,
   type User,
 } from 'firebase/auth';
-import {
-  getFirestore,
-  collection,
-  onSnapshot,
-  orderBy,
-  query,
-  Timestamp,
-} from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import type { AuthService } from './AuthService';
 import type { AuthUser, AllowedUser, AccessRequest, AppActivityEntry } from '../types';
+// Reuses the same Firestore instance FirebaseTripRepository creates (via
+// initializeFirestore(..., { ignoreUndefinedProperties: true })) rather
+// than calling getFirestore() here — Firestore settings can only be set
+// once per app, so this file must never be the first to touch Firestore.
+import { getDb } from './firebaseTripRepository';
 
 const FUNCTIONS_REGION = 'europe-west1';
 
@@ -113,7 +111,7 @@ export class FirebaseAuthService implements AuthService {
   }
 
   subscribeToAllowedUsers(cb: (users: AllowedUser[]) => void): () => void {
-    const q = query(collection(getFirestore(), 'allowedUsers'), orderBy('createdAt', 'desc'));
+    const q = query(collection(getDb(), 'allowedUsers'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snap) => {
       cb(
         snap.docs.map((d) => ({
@@ -127,7 +125,7 @@ export class FirebaseAuthService implements AuthService {
   }
 
   subscribeToAccessRequests(cb: (requests: AccessRequest[]) => void): () => void {
-    const q = query(collection(getFirestore(), 'accessRequests'), orderBy('lastSeenAt', 'desc'));
+    const q = query(collection(getDb(), 'accessRequests'), orderBy('lastSeenAt', 'desc'));
     return onSnapshot(q, (snap) => {
       cb(
         snap.docs.map((d) => ({
@@ -142,7 +140,7 @@ export class FirebaseAuthService implements AuthService {
   }
 
   subscribeToAppActivity(cb: (entries: AppActivityEntry[]) => void): () => void {
-    const q = query(collection(getFirestore(), 'appActivityLog'), orderBy('createdAt', 'desc'));
+    const q = query(collection(getDb(), 'appActivityLog'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snap) => {
       cb(
         snap.docs.map((d) => ({
