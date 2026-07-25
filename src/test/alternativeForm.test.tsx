@@ -29,6 +29,21 @@ function getWebsiteInput() {
   return screen.getByRole('textbox', { name: /website/i });
 }
 
+function getNotesInput() {
+  return screen.getByRole('textbox', { name: /notes/i });
+}
+
+// The notes field is a Tiptap rich-text editor (contenteditable), not a plain
+// <textarea> — fireEvent.change doesn't apply. Paste events are the one input
+// mechanism ProseMirror handles reliably under jsdom.
+function pasteIntoNotes(text: string) {
+  const notesInput = getNotesInput();
+  fireEvent.focus(notesInput);
+  fireEvent.paste(notesInput, {
+    clipboardData: { getData: (fmt: string) => (fmt === 'text/plain' ? text : '') },
+  });
+}
+
 describe('AlternativeForm Google Maps / Search links and website field', () => {
   it('hides the Maps and Search links when name and location are both empty', () => {
     renderWithProviders(<AlternativeForm onSave={vi.fn()} onCancel={vi.fn()} />);
@@ -95,6 +110,24 @@ describe('AlternativeForm Google Maps / Search links and website field', () => {
     fireEvent.change(getWebsiteInput(), { target: { value: 'https://example.com' } });
     const link = screen.getByRole('link', { name: /visit website/i });
     expect(link.getAttribute('href')).toBe('https://example.com');
+  });
+});
+
+describe('AlternativeForm notes', () => {
+  it('round-trips raw markdown through onSave', async () => {
+    const onSave = vi.fn();
+    renderWithProviders(<AlternativeForm onSave={onSave} onCancel={vi.fn()} />);
+    fireEvent.change(getNameInput(), { target: { value: 'Markdown Alt' } });
+    pasteIntoNotes('**bring cash**');
+    fireEvent.submit(document.querySelector('form')!);
+    expect(onSave.mock.calls[0][0].notes).toBe('**bring cash**');
+  });
+
+  it('renders bold markdown notes as a real element', async () => {
+    renderWithProviders(<AlternativeForm onSave={vi.fn()} onCancel={vi.fn()} />);
+    pasteIntoNotes('**bring cash**');
+    const strong = await screen.findByText('bring cash');
+    expect(strong.tagName).toBe('STRONG');
   });
 });
 

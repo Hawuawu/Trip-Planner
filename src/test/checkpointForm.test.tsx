@@ -41,6 +41,17 @@ function getNotesInput() {
   return screen.getByRole('textbox', { name: /notes/i });
 }
 
+// The notes field is a Tiptap rich-text editor (contenteditable), not a plain
+// <textarea> — fireEvent.change doesn't apply. Paste events are the one input
+// mechanism ProseMirror handles reliably under jsdom.
+function pasteIntoNotes(text: string) {
+  const notesInput = getNotesInput();
+  fireEvent.focus(notesInput);
+  fireEvent.paste(notesInput, {
+    clipboardData: { getData: (fmt: string) => (fmt === 'text/plain' ? text : '') },
+  });
+}
+
 function getWebsiteInput() {
   return screen.getByRole('textbox', { name: /website/i });
 }
@@ -173,7 +184,7 @@ describe('CheckpointForm', () => {
     expect(onSave.mock.calls[0][0].notes).toBeUndefined();
   });
 
-  it('includes notes when the notes textarea has content', async () => {
+  it('includes notes when the notes editor has content', async () => {
     const onSave = vi.fn();
     renderWithProviders(
       <CheckpointForm
@@ -183,9 +194,28 @@ describe('CheckpointForm', () => {
       />
     );
     fireEvent.change(getNameInput(), { target: { value: 'With Notes' } });
-    fireEvent.change(getNotesInput(), { target: { value: 'Some note text' } });
+    pasteIntoNotes('Some note text');
     fireEvent.submit(document.querySelector('form')!);
     expect(onSave.mock.calls[0][0].notes).toBe('Some note text');
+  });
+
+  it('renders bold markdown notes as real elements and keeps the raw markdown on save', async () => {
+    const onSave = vi.fn();
+    renderWithProviders(
+      <CheckpointForm
+        onSave={onSave}
+        onCancel={vi.fn()}
+        defaultStartTime="2026-10-01T14:00:00.000Z"
+      />
+    );
+    fireEvent.change(getNameInput(), { target: { value: 'Markdown Notes' } });
+    pasteIntoNotes('**bold** note');
+
+    const strong = await screen.findByText('bold');
+    expect(strong.tagName).toBe('STRONG');
+
+    fireEvent.submit(document.querySelector('form')!);
+    expect(onSave.mock.calls[0][0].notes).toBe('**bold** note');
   });
 
   it('pre-fills name and notes from initial prop', () => {
@@ -202,7 +232,7 @@ describe('CheckpointForm', () => {
       />
     );
     expect(getNameInput()).toHaveValue('Shinjuku Hotel');
-    expect(getNotesInput()).toHaveValue('Check-in at 3pm');
+    expect(getNotesInput()).toHaveTextContent('Check-in at 3pm');
   });
 
   it('renders the Type select field with a value', () => {

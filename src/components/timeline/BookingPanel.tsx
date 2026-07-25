@@ -14,6 +14,8 @@ import {
 } from '@mui/material';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { useTripStore } from '../../store/tripStore';
+import { MarkdownNotes } from '../shared/MarkdownNotes';
+import { MarkdownNotesField } from '../shared/MarkdownNotesField';
 
 interface Props {
   checkpointId: string;
@@ -107,13 +109,11 @@ export function BookingPanel({ checkpointId, linkedBookingId }: Props) {
               {linkedBooking.confirmationNumber}
             </Typography>
             {linkedBooking.notes && (
-              <Typography
+              <MarkdownNotes
+                notes={linkedBooking.notes}
                 variant="caption"
-                color="text.secondary"
                 sx={{ display: 'block', mt: 0.5 }}
-              >
-                {linkedBooking.notes}
-              </Typography>
+              />
             )}
             <Button size="small" color="error" onClick={handleRemoveLink} sx={{ mt: 1, px: 0 }}>
               Remove link
@@ -160,14 +160,10 @@ export function BookingPanel({ checkpointId, linkedBookingId }: Props) {
               fullWidth
               inputProps={{ 'data-testid': 'booking-confirmation' }}
             />
-            <TextField
+            <MarkdownNotesField
               label="Notes (optional)"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              size="small"
-              fullWidth
-              multiline
-              rows={2}
+              onChange={setNotes}
               inputProps={{ 'data-testid': 'booking-notes' }}
             />
           </Stack>

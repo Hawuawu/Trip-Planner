@@ -28,6 +28,7 @@ export interface Alternative {
   notes?: string;
   websiteUrl?: string;
   tags?: string[];
+  createdAt?: string; // ISO string; optional — absent on legacy items created before #76
 }
 
 export interface Booking {

@@ -11,6 +11,12 @@ export function renderWithProviders(ui: React.ReactElement) {
 
 // Initial states mirror the store definitions so setState(..., true) fully
 // replaces the store state (the second arg triggers replace mode in Zustand).
+//
+// The loading flags are a deliberate exception: the store defaults them to
+// `true` to reproduce real app boot (see tripStore.ts init()), but tests
+// want an already-settled screen without having to call init() themselves,
+// so they're reset to `false` here. Don't "fix" this back to `true` — that
+// would silently reintroduce the stale-empty-state flash issue #78 fixed.
 const tripInitialState = {
   trip: null,
   checkpoints: [],
@@ -24,6 +30,9 @@ const tripInitialState = {
   undoCheckpoint: null,
   repo: null,
   tripId: null,
+  tripLoading: false,
+  checkpointsLoading: false,
+  alternativesLoading: false,
 };
 
 const authInitialState = {

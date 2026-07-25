@@ -59,7 +59,11 @@ function toCheckpoint(id: string, d: Record<string, unknown>): Checkpoint {
 }
 
 function toAlternative(id: string, d: Record<string, unknown>): Alternative {
-  return { id, ...(d as Omit<Alternative, 'id'>) };
+  return {
+    id,
+    ...(d as Omit<Alternative, 'id' | 'createdAt'>),
+    createdAt: d.createdAt ? toIso(d.createdAt) : undefined,
+  };
 }
 
 function toBooking(id: string, d: Record<string, unknown>): Booking {
@@ -202,27 +206,35 @@ export class FirebaseClientTripRepository {
     return Array.from(set).sort();
   }
 
-  async addAlternative(tripId: string, alt: Omit<Alternative, 'id'>): Promise<Alternative> {
-    const ref = await addDoc(collection(this.db, 'trips', tripId, 'alternatives'), alt);
-    return { ...alt, id: ref.id };
+  async addAlternative(
+    tripId: string,
+    alt: Omit<Alternative, 'id' | 'createdAt'>
+  ): Promise<Alternative> {
+    const now = new Date().toISOString();
+    const ref = await addDoc(collection(this.db, 'trips', tripId, 'alternatives'), {
+      ...alt,
+      createdAt: serverTimestamp(),
+    });
+    return { ...alt, id: ref.id, createdAt: now };
   }
 
   async addAlternatives(
     tripId: string,
-    alternatives: Omit<Alternative, 'id'>[]
+    alternatives: Omit<Alternative, 'id' | 'createdAt'>[]
   ): Promise<Alternative[]> {
+    const now = new Date().toISOString();
     const batch = writeBatch(this.db);
     const collectionRef = collection(this.db, 'trips', tripId, 'alternatives');
     const refs = alternatives.map(() => doc(collectionRef));
-    alternatives.forEach((alt, i) => batch.set(refs[i], alt));
+    alternatives.forEach((alt, i) => batch.set(refs[i], { ...alt, createdAt: serverTimestamp() }));
     await batch.commit();
-    return alternatives.map((alt, i) => ({ ...alt, id: refs[i].id }));
+    return alternatives.map((alt, i) => ({ ...alt, id: refs[i].id, createdAt: now }));
   }
 
   async updateAlternative(
     tripId: string,
     id: string,
-    changes: Partial<Omit<Alternative, 'id'>>
+    changes: Partial<Omit<Alternative, 'id' | 'createdAt'>>
   ): Promise<void> {
     await updateDoc(doc(this.db, 'trips', tripId, 'alternatives', id), { ...changes });
   }

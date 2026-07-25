@@ -33,12 +33,15 @@ export interface TripRepository {
   ): Promise<void>;
   deleteCheckpoint(tripId: string, id: string): Promise<void>;
   subscribeToAlternatives(tripId: string, cb: (alternatives: Alternative[]) => void): () => void;
-  addAlternative(tripId: string, alt: Omit<Alternative, 'id'>): Promise<Alternative>;
-  addAlternatives(tripId: string, alternatives: Omit<Alternative, 'id'>[]): Promise<Alternative[]>;
+  addAlternative(tripId: string, alt: Omit<Alternative, 'id' | 'createdAt'>): Promise<Alternative>;
+  addAlternatives(
+    tripId: string,
+    alternatives: Omit<Alternative, 'id' | 'createdAt'>[]
+  ): Promise<Alternative[]>;
   updateAlternative(
     tripId: string,
     id: string,
-    changes: Partial<Omit<Alternative, 'id'>>
+    changes: Partial<Omit<Alternative, 'id' | 'createdAt'>>
   ): Promise<void>;
   deleteAlternative(tripId: string, id: string): Promise<void>;
   promoteAlternative(tripId: string, alternativeId: string, startTime: string): Promise<void>;

@@ -52,6 +52,21 @@ describe('AlternativesShelf', () => {
     expect(screen.getByText('Azabudai Hills')).toBeInTheDocument();
   });
 
+  it('renders markdown notes as real elements, not literal syntax', () => {
+    seedAlternatives([{ ...ALT1, notes: 'try the **matcha** set' }]);
+    renderWithProviders(<AlternativesShelf />);
+    const strong = screen.getByText('matcha');
+    expect(strong.tagName).toBe('STRONG');
+  });
+
+  it('shows the location label as plain text alongside markdown-rendered notes when both are set', () => {
+    seedAlternatives([{ ...ALT2, notes: 'try the **matcha** set' }]);
+    renderWithProviders(<AlternativesShelf />);
+    expect(screen.getByText('Nishiki, Kyoto')).toBeInTheDocument();
+    const strong = screen.getByText('matcha');
+    expect(strong.tagName).toBe('STRONG');
+  });
+
   it('renders an svg icon for each alternative type', () => {
     seedAlternatives([ALT1, ALT2]);
     const { container } = renderWithProviders(<AlternativesShelf />);

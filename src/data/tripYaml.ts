@@ -9,7 +9,7 @@ export interface YamlValidationError {
 }
 
 export type ImportableCheckpoint = Omit<Checkpoint, 'id' | 'updatedAt' | 'linkedBookingId'>;
-export type ImportableAlternative = Omit<Alternative, 'id'>;
+export type ImportableAlternative = Omit<Alternative, 'id' | 'createdAt'>;
 
 export interface ParsedCheckpointsYaml {
   checkpoints: ImportableCheckpoint[];
@@ -290,7 +290,7 @@ function toExportCheckpoint(cp: Checkpoint): ImportableCheckpoint {
 }
 
 function toExportAlternative(alt: Alternative): ImportableAlternative {
-  const { id: _id, ...rest } = alt;
+  const { id: _id, createdAt: _createdAt, ...rest } = alt;
   return rest;
 }
 
