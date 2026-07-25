@@ -17,6 +17,7 @@ import {
   Divider,
   Snackbar,
   Alert,
+  Button,
 } from '@mui/material';
 import ViewTimelineIcon from '@mui/icons-material/ViewTimeline';
 import MapIcon from '@mui/icons-material/Map';
@@ -40,6 +41,8 @@ import { useAuthStore } from '../../store/authStore';
 import { canManage } from '../../utils/tripPermissions';
 import { TripMembersDialog } from '../trips/TripMembersDialog';
 import { ActivityLogView } from '../trips/ActivityLogView';
+import { RouteSelectorDialog } from '../routes/RouteSelectorDialog';
+import { DaySelectorMenu } from '../routes/DaySelectorMenu';
 import appIcon from '../../assets/app-icon.svg';
 import sakuraPattern from '../../assets/sakura-pattern.svg';
 import sakuraBranch from '../../assets/sakura-branch.svg';
@@ -49,6 +52,7 @@ import {
   type ParsedCheckpointsYaml,
 } from '../../data/tripYaml';
 import { downloadTextFile, slugifyFilename } from '../../utils/fileTransfer';
+import { formatDayLabel } from '../../utils/date';
 import { YamlImportDialog } from '../trips/YamlImportDialog';
 
 interface Props {
@@ -181,6 +185,9 @@ export function AppShell({ onBack }: Props) {
   const checkpoints = useTripStore((s) => s.checkpoints);
   const alternatives = useTripStore((s) => s.alternatives);
   const activityLog = useTripStore((s) => s.activityLog);
+  const routes = useTripStore((s) => s.routes);
+  const selectedDay = useTripStore((s) => s.selectedDay);
+  const selectedRouteId = useTripStore((s) => s.selectedRouteId);
   const currentUid = useAuthStore((s) => s.user?.uid);
   const isOwner = trip ? canManage(trip, currentUid) : false;
 
@@ -188,6 +195,8 @@ export function AppShell({ onBack }: Props) {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [activityLogOpen, setActivityLogOpen] = useState(false);
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
+  const [dayMenuAnchor, setDayMenuAnchor] = useState<HTMLElement | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
   const [addCheckpointSignal, setAddCheckpointSignal] = useState(0);
   const [addAlternativeSignal, setAddAlternativeSignal] = useState(0);
@@ -197,6 +206,10 @@ export function AppShell({ onBack }: Props) {
   } | null>(null);
 
   const panelWidth = isWide ? 380 : 320;
+
+  const activeRoute = selectedRouteId ? routes.find((r) => r.id === selectedRouteId) : undefined;
+  const routeLabel = activeRoute ? activeRoute.name : 'Default route';
+  const dayLabel = selectedDay ? formatDayLabel(selectedDay) : 'All days';
 
   function handleExportTrip() {
     setMenuOpen(false);
@@ -367,6 +380,38 @@ export function AppShell({ onBack }: Props) {
 
       <OfflineBanner />
 
+      {trip && (
+        <Box
+          sx={{
+            px: 2,
+            py: 1,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            Selected
+          </Typography>
+          <Button size="small" variant="outlined" onClick={() => setRouteDialogOpen(true)}>
+            {routeLabel}
+          </Button>
+          <Typography variant="body2" color="text.secondary">
+            for
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={(e) => setDayMenuAnchor(e.currentTarget)}
+          >
+            {dayLabel}
+          </Button>
+        </Box>
+      )}
+
       {isPhone ? (
         <>
           <Box sx={{ flex: 1, overflow: 'hidden' }}>
@@ -377,7 +422,10 @@ export function AppShell({ onBack }: Props) {
                 size="contain"
                 position="top center"
               >
-                <TimelineView openAddSignal={addCheckpointSignal || undefined} />
+                <TimelineView
+                  openAddSignal={addCheckpointSignal || undefined}
+                  onSaved={setSnackbar}
+                />
               </TexturedPanel>
             )}
             {tab === 1 && <MapView onPoiSelected={handlePoiSelected} />}
@@ -386,6 +434,7 @@ export function AppShell({ onBack }: Props) {
                 <AlternativesShelf
                   openAddSignal={addAlternativeSignal || undefined}
                   prefill={alternativePrefill}
+                  onSaved={setSnackbar}
                 />
               </TexturedPanel>
             )}
@@ -420,7 +469,10 @@ export function AppShell({ onBack }: Props) {
                 size="contain"
                 position="top center"
               >
-                <TimelineView openAddSignal={addCheckpointSignal || undefined} />
+                <TimelineView
+                  openAddSignal={addCheckpointSignal || undefined}
+                  onSaved={setSnackbar}
+                />
               </TexturedPanel>
             </Box>
           )}
@@ -460,6 +512,7 @@ export function AppShell({ onBack }: Props) {
                 <AlternativesShelf
                   openAddSignal={addAlternativeSignal || undefined}
                   prefill={alternativePrefill}
+                  onSaved={setSnackbar}
                 />
               </TexturedPanel>
             </Box>
@@ -496,6 +549,16 @@ export function AppShell({ onBack }: Props) {
           isOwner={isOwner}
         />
       )}
+
+      {trip && (
+        <RouteSelectorDialog
+          open={routeDialogOpen}
+          onClose={() => setRouteDialogOpen(false)}
+          onSaved={setSnackbar}
+        />
+      )}
+
+      <DaySelectorMenu anchorEl={dayMenuAnchor} onClose={() => setDayMenuAnchor(null)} />
 
       <Snackbar open={Boolean(snackbar)} autoHideDuration={4000} onClose={() => setSnackbar(null)}>
         <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: '100%' }}>

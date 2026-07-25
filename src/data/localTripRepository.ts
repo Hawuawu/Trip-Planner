@@ -4,6 +4,7 @@ import type {
   Checkpoint,
   Alternative,
   Booking,
+  Route,
   ActivityLogEntry,
   ActivityLogEntryType,
   InviteMemberResult,
@@ -101,6 +102,7 @@ const SEED_ALTERNATIVES: Alternative[] = [
 const LS_CP = 'trip-planner:checkpoints';
 const LS_ALT = 'trip-planner:alternatives';
 const LS_BOOKINGS = 'trip-planner:bookings';
+const LS_ROUTES = 'trip-planner:routes';
 const LS_TRIPS = 'trip-planner:trips';
 const LS_ACTIVITY = 'trip-planner:activityLog';
 
@@ -156,6 +158,19 @@ function saveBookings(b: Booking[]) {
   localStorage.setItem(LS_BOOKINGS, JSON.stringify(b));
 }
 
+function loadRoutes(): Route[] {
+  try {
+    const raw = localStorage.getItem(LS_ROUTES);
+    return raw ? (JSON.parse(raw) as Route[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRoutes(r: Route[]) {
+  localStorage.setItem(LS_ROUTES, JSON.stringify(r));
+}
+
 function loadLog(): ActivityLogEntry[] {
   try {
     const raw = localStorage.getItem(LS_ACTIVITY);
@@ -173,6 +188,7 @@ export class LocalTripRepository implements TripRepository {
   private cpSubs = new Map<string, Set<(c: Checkpoint[]) => void>>();
   private altSubs = new Map<string, Set<(a: Alternative[]) => void>>();
   private bookingSubs = new Map<string, Set<(b: Booking[]) => void>>();
+  private routeSubs = new Map<string, Set<(r: Route[]) => void>>();
   private tripSubs = new Map<string, Set<(t: Trip) => void>>();
   private logSubs = new Map<string, Set<(e: ActivityLogEntry[]) => void>>();
 
@@ -462,6 +478,56 @@ export class LocalTripRepository implements TripRepository {
     saveBookings(loadBookings().filter((b) => b.id !== id));
     this.notifyBookings(tripId);
     this.pushActivity(tripId, { type: 'booking_deleted', entityName: target?.provider });
+  }
+
+  subscribeToRoutes(tripId: string, cb: (r: Route[]) => void): () => void {
+    if (!this.routeSubs.has(tripId)) this.routeSubs.set(tripId, new Set());
+    this.routeSubs.get(tripId)!.add(cb);
+    cb(loadRoutes());
+    return () => {
+      this.routeSubs.get(tripId)?.delete(cb);
+    };
+  }
+
+  private notifyRoutes(tripId: string) {
+    this.routeSubs.get(tripId)?.forEach((cb) => cb(loadRoutes()));
+  }
+
+  async addRoute(tripId: string, route: Omit<Route, 'id' | 'updatedAt'>): Promise<Route> {
+    const saved: Route = {
+      ...route,
+      id: `local-route-${Date.now()}`,
+      updatedAt: new Date().toISOString(),
+    };
+    saveRoutes([...loadRoutes(), saved]);
+    this.notifyRoutes(tripId);
+    this.pushActivity(tripId, { type: 'route_added', entityName: route.name });
+    return saved;
+  }
+
+  async updateRoute(
+    tripId: string,
+    id: string,
+    changes: Partial<Omit<Route, 'id' | 'updatedAt'>>
+  ): Promise<void> {
+    saveRoutes(
+      loadRoutes().map((r) =>
+        r.id === id ? { ...r, ...changes, updatedAt: new Date().toISOString() } : r
+      )
+    );
+    this.notifyRoutes(tripId);
+    this.pushActivity(tripId, {
+      type: 'route_updated',
+      entityName: changes.name,
+      changedFields: Object.keys(changes),
+    });
+  }
+
+  async deleteRoute(tripId: string, id: string): Promise<void> {
+    const target = loadRoutes().find((r) => r.id === id);
+    saveRoutes(loadRoutes().filter((r) => r.id !== id));
+    this.notifyRoutes(tripId);
+    this.pushActivity(tripId, { type: 'route_deleted', entityName: target?.name });
   }
 
   async listTrips(): Promise<Trip[]> {

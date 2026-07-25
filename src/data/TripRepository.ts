@@ -3,6 +3,7 @@ import type {
   Checkpoint,
   Alternative,
   Booking,
+  Route,
   ActivityLogEntry,
   InviteMemberResult,
 } from '../types';
@@ -45,4 +46,13 @@ export interface TripRepository {
   addBooking(tripId: string, booking: Omit<Booking, 'id'>): Promise<Booking>;
   updateBooking(tripId: string, id: string, changes: Partial<Omit<Booking, 'id'>>): Promise<void>;
   deleteBooking(tripId: string, id: string): Promise<void>;
+
+  subscribeToRoutes(tripId: string, cb: (routes: Route[]) => void): () => void;
+  addRoute(tripId: string, route: Omit<Route, 'id' | 'updatedAt'>): Promise<Route>;
+  updateRoute(
+    tripId: string,
+    id: string,
+    changes: Partial<Omit<Route, 'id' | 'updatedAt'>>
+  ): Promise<void>;
+  deleteRoute(tripId: string, id: string): Promise<void>;
 }

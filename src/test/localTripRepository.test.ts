@@ -616,6 +616,102 @@ describe('LocalTripRepository — bookings', () => {
   });
 });
 
+// ── routes ────────────────────────────────────────────────────────────────────
+
+describe('LocalTripRepository — routes', () => {
+  it('subscribeToRoutes immediately calls the callback with an empty array (no seed data)', () => {
+    const repo = makeRepo();
+    const cb = vi.fn();
+    repo.subscribeToRoutes('t1', cb);
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb.mock.calls[0][0]).toEqual([]);
+  });
+
+  it('addRoute returns saved route with id, prefixed local-route-, and updatedAt', async () => {
+    const repo = makeRepo();
+    const saved = await repo.addRoute('t1', {
+      name: 'Nature route',
+      days: ['2026-10-05', '2026-10-06'],
+      checkpointIds: ['cp-1', 'cp-2'],
+    });
+    expect(saved.id).toMatch(/^local-route-/);
+    expect(saved.name).toBe('Nature route');
+    expect(saved.days).toEqual(['2026-10-05', '2026-10-06']);
+    expect(saved.checkpointIds).toEqual(['cp-1', 'cp-2']);
+    expect(typeof saved.updatedAt).toBe('string');
+  });
+
+  it('addRoute notifies subscribers', async () => {
+    const repo = makeRepo();
+    const cb = vi.fn();
+    repo.subscribeToRoutes('t1', cb);
+    const callsBefore = cb.mock.calls.length;
+    await repo.addRoute('t1', { name: 'Anime route', days: ['2026-10-06'], checkpointIds: [] });
+    expect(cb.mock.calls.length).toBeGreaterThan(callsBefore);
+    const latest = cb.mock.calls[cb.mock.calls.length - 1][0];
+    expect(latest.some((r: { name: string }) => r.name === 'Anime route')).toBe(true);
+  });
+
+  it('updateRoute merges changes and bumps updatedAt', async () => {
+    const repo = makeRepo();
+    const saved = await repo.addRoute('t1', {
+      name: 'Before',
+      days: ['2026-10-05'],
+      checkpointIds: [],
+    });
+    const originalUpdatedAt = saved.updatedAt;
+    await new Promise((r) => setTimeout(r, 5));
+    await repo.updateRoute('t1', saved.id, { name: 'After', checkpointIds: ['cp-3'] });
+    const cb = vi.fn();
+    repo.subscribeToRoutes('t1', cb);
+    const updated = cb.mock.calls[0][0].find((r: { id: string }) => r.id === saved.id);
+    expect(updated?.name).toBe('After');
+    expect(updated?.checkpointIds).toEqual(['cp-3']);
+    expect(updated?.updatedAt).not.toBe(originalUpdatedAt);
+  });
+
+  it('deleteRoute removes entry and notifies subscribers', async () => {
+    const repo = makeRepo();
+    const saved = await repo.addRoute('t1', {
+      name: 'To Remove',
+      days: ['2026-10-05'],
+      checkpointIds: [],
+    });
+    const cb = vi.fn();
+    repo.subscribeToRoutes('t1', cb);
+    await repo.deleteRoute('t1', saved.id);
+    const latest = cb.mock.calls[cb.mock.calls.length - 1][0];
+    expect(latest.find((r: { id: string }) => r.id === saved.id)).toBeUndefined();
+  });
+
+  it('persists routes across a new repo instance (via localStorage)', async () => {
+    const repo1 = makeRepo();
+    await repo1.addRoute('t1', {
+      name: 'City route',
+      days: ['2026-10-07'],
+      checkpointIds: [],
+    });
+    const repo2 = makeRepo();
+    const cb = vi.fn();
+    repo2.subscribeToRoutes('t1', cb);
+    const routes = cb.mock.calls[0][0];
+    expect(routes.some((r: { name: string }) => r.name === 'City route')).toBe(true);
+  });
+
+  it('logs a route_added activity entry when a route is added', async () => {
+    const repo = makeRepo();
+    const cb = vi.fn();
+    repo.subscribeToActivityLog('t1', cb);
+    cb.mockClear();
+    await repo.addRoute('t1', { name: 'Nature route', days: ['2026-10-05'], checkpointIds: [] });
+    expect(cb).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'route_added', entityName: 'Nature route' }),
+      ])
+    );
+  });
+});
+
 describe('LocalTripRepository — subscribeToTrip', () => {
   it('immediately calls back with the demo trip for an unknown id', () => {
     const repo = makeRepo();

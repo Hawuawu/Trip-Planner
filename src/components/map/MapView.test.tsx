@@ -159,4 +159,47 @@ describe('MapView', () => {
 
     expect(onPoiSelected).not.toHaveBeenCalled();
   });
+
+  describe('day / route filtering', () => {
+    it('renders markers only for checkpoints on the selected day', () => {
+      useTripStore.setState({
+        checkpoints: [
+          makeCheckpoint({ id: 'a', startTime: '2026-09-05T09:00:00.000Z' }),
+          makeCheckpoint({ id: 'b', startTime: '2026-09-06T09:00:00.000Z' }),
+        ],
+        selectedDay: '2026-09-05',
+      });
+      renderWithProviders(<MapView />);
+      expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    });
+
+    it("renders markers only for a selected route's checkpointIds", () => {
+      useTripStore.setState({
+        checkpoints: [makeCheckpoint({ id: 'a' }), makeCheckpoint({ id: 'b' })],
+        routes: [
+          {
+            id: 'route-1',
+            name: 'Nature route',
+            days: ['2026-09-05'],
+            checkpointIds: ['a'],
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        selectedRouteId: 'route-1',
+      });
+      renderWithProviders(<MapView />);
+      expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    });
+
+    it('renders all located checkpoints when no day or route is selected', () => {
+      useTripStore.setState({
+        checkpoints: [
+          makeCheckpoint({ id: 'a', startTime: '2026-09-05T09:00:00.000Z' }),
+          makeCheckpoint({ id: 'b', startTime: '2026-09-06T09:00:00.000Z' }),
+        ],
+      });
+      renderWithProviders(<MapView />);
+      expect(screen.getAllByTestId('marker')).toHaveLength(2);
+    });
+  });
 });

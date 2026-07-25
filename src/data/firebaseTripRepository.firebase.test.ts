@@ -494,6 +494,54 @@ describe('Security rules — trips/{tripId}/alternatives', () => {
   });
 });
 
+describe('Security rules — trips/{tripId}/routes', () => {
+  const TRIP_ID = 'trip-route-rules-1';
+  const MEMBER_UID = 'member-route';
+  const OUTSIDER_UID = 'outsider-route';
+
+  beforeEach(async () => {
+    await seedTrip(TRIP_ID, [MEMBER_UID]);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .collection('trips')
+        .doc(TRIP_ID)
+        .collection('routes')
+        .doc('route-1')
+        .set({
+          name: 'Nature route',
+          days: ['2026-10-05'],
+          checkpointIds: ['cp-1'],
+        });
+    });
+  });
+
+  it('member CAN read routes', async () => {
+    const db = approvedDb(MEMBER_UID);
+    await assertSucceeds(
+      db.collection('trips').doc(TRIP_ID).collection('routes').doc('route-1').get()
+    );
+  });
+
+  it('member CAN write routes', async () => {
+    const db = approvedDb(MEMBER_UID);
+    await assertSucceeds(
+      db
+        .collection('trips')
+        .doc(TRIP_ID)
+        .collection('routes')
+        .add({ name: 'Anime route', days: ['2026-10-06'], checkpointIds: [] })
+    );
+  });
+
+  it('non-member CANNOT read routes', async () => {
+    const db = approvedDb(OUTSIDER_UID);
+    await assertFails(
+      db.collection('trips').doc(TRIP_ID).collection('routes').doc('route-1').get()
+    );
+  });
+});
+
 describe('Security rules — trips/{tripId}/bookings', () => {
   const TRIP_ID = 'trip-bk-rules-1';
   const MEMBER_UID = 'member-bk';

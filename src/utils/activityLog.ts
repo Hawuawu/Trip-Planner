@@ -43,6 +43,9 @@ const FORMATTERS: Record<ActivityLogEntryType, Formatter> = {
   booking_added: quoted('added', 'booking'),
   booking_updated: updated('booking', 'a'),
   booking_deleted: quoted('deleted', 'booking'),
+  route_added: quoted('added', 'route'),
+  route_updated: updated('route', 'a'),
+  route_deleted: quoted('deleted', 'route'),
 };
 
 export function formatActivityLogEntry(entry: ActivityLogEntry): string {

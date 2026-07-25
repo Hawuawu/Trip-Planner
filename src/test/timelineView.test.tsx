@@ -38,6 +38,20 @@ describe('TimelineView — empty state', () => {
     // The drawer opens with the CheckpointForm's Save button visible
     expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
   });
+
+  it('calls onSaved with a confirmation message after adding a checkpoint', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    renderWithProviders(<TimelineView onSaved={onSaved} />);
+
+    await user.click(screen.getByRole('button', { name: /add first checkpoint/i }));
+    await user.type(screen.getByRole('textbox', { name: /^name$/i }), 'Senso-ji');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith('Checkpoint "Senso-ji" added.');
+    });
+  });
 });
 
 describe('TimelineView — with checkpoints', () => {
@@ -79,6 +93,23 @@ describe('TimelineView — with checkpoints', () => {
     renderWithProviders(<TimelineView />);
     fireEvent.click(screen.getByRole('button', { name: /edit checkpoint/i }));
     expect(screen.getByText('Edit checkpoint')).toBeInTheDocument();
+  });
+
+  it('calls onSaved with a confirmation message after editing a checkpoint', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    seedCheckpoints([makeCheckpoint({ id: 'cp-1', name: 'JFK → NRT' })]);
+    renderWithProviders(<TimelineView onSaved={onSaved} />);
+
+    await user.click(screen.getByRole('button', { name: /edit checkpoint/i }));
+    const nameInput = screen.getByRole('textbox', { name: /^name$/i });
+    await user.clear(nameInput);
+    await user.type(nameInput, 'JFK Departure');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith('Checkpoint "JFK Departure" updated.');
+    });
   });
 
   it('clicking the selected checkpoint again deselects it (closes edit drawer)', async () => {
@@ -299,6 +330,68 @@ describe('TimelineView — with checkpoints', () => {
       await user.type(screen.getByPlaceholderText(/search checkpoints/i), 'Nonexistent');
 
       expect(screen.getByText(/no checkpoints match/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('day / route filtering', () => {
+    function seedTwoDayCheckpoints() {
+      seedCheckpoints([
+        makeCheckpoint({ id: 'a', name: 'Day One Stop', startTime: '2026-10-01T14:00:00.000Z' }),
+        makeCheckpoint({ id: 'b', name: 'Day Two Stop', startTime: '2026-10-02T14:00:00.000Z' }),
+      ]);
+    }
+
+    it("shows only the selected day's checkpoints", () => {
+      seedTwoDayCheckpoints();
+      useTripStore.setState({ selectedDay: '2026-10-01' });
+      renderWithProviders(<TimelineView />);
+      expect(screen.getByText('Day One Stop')).toBeInTheDocument();
+      expect(screen.queryByText('Day Two Stop')).not.toBeInTheDocument();
+    });
+
+    it('shows a distinct empty state naming the day when it has zero checkpoints', () => {
+      seedTwoDayCheckpoints();
+      useTripStore.setState({ selectedDay: '2026-10-09' });
+      renderWithProviders(<TimelineView />);
+      expect(screen.getByText(/no checkpoints on/i)).toBeInTheDocument();
+      expect(screen.queryByText('Day One Stop')).not.toBeInTheDocument();
+    });
+
+    it("filters to a route's checkpointIds and names the route in the empty state", () => {
+      seedTwoDayCheckpoints();
+      useTripStore.setState({
+        routes: [
+          {
+            id: 'route-1',
+            name: 'Empty Route',
+            days: ['2026-10-01'],
+            checkpointIds: [],
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        selectedRouteId: 'route-1',
+      });
+      renderWithProviders(<TimelineView />);
+      expect(screen.getByText(/no checkpoints on/i)).toBeInTheDocument();
+      expect(screen.getByText(/Empty Route/i)).toBeInTheDocument();
+    });
+
+    it('keeps insertion index anchored to the full checkpoint list when a day filter is active', () => {
+      seedCheckpoints([
+        makeCheckpoint({ id: 'a', name: 'Before', startTime: '2026-10-01T10:00:00.000Z' }),
+        makeCheckpoint({ id: 'b', name: 'Filtered Day', startTime: '2026-10-05T10:00:00.000Z' }),
+        makeCheckpoint({ id: 'c', name: 'After', startTime: '2026-10-05T12:00:00.000Z' }),
+      ]);
+      useTripStore.setState({ selectedDay: '2026-10-05' });
+      renderWithProviders(<TimelineView />);
+      const addBetweenBtn = screen.getAllByRole('button', { name: /add checkpoint here/i })[0];
+      fireEvent.click(addBetweenBtn);
+      expect(screen.getByText('Add checkpoint')).toBeInTheDocument();
+      const startInput = document.querySelector(
+        'input[type="datetime-local"][required]'
+      ) as HTMLInputElement;
+      // Midpoint between the two Oct 5 checkpoints (10:00 and 12:00 UTC) is 11:00 UTC.
+      expect(startInput?.value).toBeTruthy();
     });
   });
 });

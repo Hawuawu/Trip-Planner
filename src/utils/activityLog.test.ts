@@ -90,6 +90,24 @@ describe('formatActivityLogEntry', () => {
     );
   });
 
+  it('formats route_added', () => {
+    expect(
+      formatActivityLogEntry(makeEntry({ type: 'route_added', entityName: 'Nature route' }))
+    ).toBe('Alice added route "Nature route"');
+  });
+
+  it('formats route_updated with a name', () => {
+    expect(
+      formatActivityLogEntry(makeEntry({ type: 'route_updated', entityName: 'Nature route' }))
+    ).toBe('Alice updated route "Nature route"');
+  });
+
+  it('formats route_deleted', () => {
+    expect(
+      formatActivityLogEntry(makeEntry({ type: 'route_deleted', entityName: 'Nature route' }))
+    ).toBe('Alice deleted route "Nature route"');
+  });
+
   it('formats checkpoint_deleted', () => {
     expect(
       formatActivityLogEntry(makeEntry({ type: 'checkpoint_deleted', entityName: 'Senso-ji' }))
