@@ -165,6 +165,18 @@ describe('AlternativeForm tags', () => {
     expect(onSave.mock.calls[0][0].tags).toEqual(['food']);
   });
 
+  it('includes a typed tag in onSave even without pressing Enter first', () => {
+    const onSave = vi.fn();
+    renderWithProviders(<AlternativeForm onSave={onSave} onCancel={vi.fn()} />);
+    fireEvent.change(getNameInput(), { target: { value: 'Tagged Alt' } });
+    const tagsInput = screen.getByRole('combobox', { name: /tags/i });
+    fireEvent.change(tagsInput, { target: { value: 'food' } });
+    // No Enter/blur to commit the chip — just submit directly, as a user
+    // clicking Save straight after typing would.
+    fireEvent.submit(document.querySelector('form')!);
+    expect(onSave.mock.calls[0][0].tags).toEqual(['food']);
+  });
+
   it('omits tags entirely when none are entered', () => {
     const onSave = vi.fn();
     renderWithProviders(<AlternativeForm onSave={onSave} onCancel={vi.fn()} />);
