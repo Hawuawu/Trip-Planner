@@ -1,0 +1,11 @@
+{
+  "terminal.integrated.env.osx": {
+    "VITE_USE_LOCAL": "true"
+  },
+  "terminal.integrated.env.linux": {
+    "VITE_USE_LOCAL": "true"
+  },
+  "terminal.integrated.env.windows": {
+    "VITE_USE_LOCAL": "true"
+  }
+}

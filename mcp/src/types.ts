@@ -40,6 +40,14 @@ export interface Booking {
   notes?: string;
 }
 
+export interface Route {
+  id: string;
+  name: string;
+  days: string[];
+  checkpointIds: string[];
+  updatedAt: string;
+}
+
 export interface MemberProfile {
   email: string | null;
   displayName: string | null;

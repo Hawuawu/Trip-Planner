@@ -49,6 +49,12 @@ const bookingInputSchema = z.object({
   notes: z.string().optional(),
 });
 
+const routeInputSchema = z.object({
+  name: z.string(),
+  days: z.array(z.string()).describe('YYYY-MM-DD date keys this route covers'),
+  checkpointIds: z.array(z.string()),
+});
+
 function json(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
 }
@@ -208,6 +214,39 @@ export function registerTools(server: McpServer, repo: FirebaseClientTripReposit
     { tripId: z.string(), bookingId: z.string(), changes: bookingInputSchema.partial() },
     async ({ tripId, bookingId, changes }) => {
       await repo.updateBooking(tripId, bookingId, changes);
+      return json({ ok: true });
+    }
+  );
+
+  server.tool(
+    'list_routes',
+    "List a trip's saved routes — named, day-scoped subsets of checkpoints (e.g. a " +
+      '"Nature route" vs an "Anime route" covering the same day with different stops).',
+    { tripId: z.string() },
+    async ({ tripId }) => json(await repo.listRoutes(tripId))
+  );
+
+  server.tool(
+    'get_route',
+    'Get a single route by id.',
+    { tripId: z.string(), routeId: z.string() },
+    async ({ tripId, routeId }) => json(await repo.getRoute(tripId, routeId))
+  );
+
+  server.tool(
+    'add_route',
+    'Add a new route to a trip — a name, the day(s) it covers, and the subset of existing ' +
+      'checkpoint ids it includes. A checkpoint may belong to more than one route.',
+    { tripId: z.string(), route: routeInputSchema },
+    async ({ tripId, route }) => json(await repo.addRoute(tripId, route))
+  );
+
+  server.tool(
+    'update_route',
+    'Edit fields on an existing route.',
+    { tripId: z.string(), routeId: z.string(), changes: routeInputSchema.partial() },
+    async ({ tripId, routeId, changes }) => {
+      await repo.updateRoute(tripId, routeId, changes);
       return json({ ok: true });
     }
   );

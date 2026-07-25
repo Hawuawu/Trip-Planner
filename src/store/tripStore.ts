@@ -5,6 +5,7 @@ import type {
   Checkpoint,
   Alternative,
   Booking,
+  Route,
   ActivityLogEntry,
   InviteMemberResult,
 } from '../types';
@@ -14,8 +15,11 @@ interface TripState {
   checkpoints: Checkpoint[];
   alternatives: Alternative[];
   bookings: Booking[];
+  routes: Route[];
   activityLog: ActivityLogEntry[];
   selectedId: string | null;
+  selectedDay: string | null;
+  selectedRouteId: string | null;
   undoCheckpoint: Checkpoint | null;
   undoAlternative: Alternative | null;
   repo: TripRepository | null;
@@ -23,6 +27,8 @@ interface TripState {
 
   init(tripId: string, repo: TripRepository): void;
   selectCheckpoint(id: string | null): void;
+  selectDay(day: string | null): void;
+  selectRoute(routeId: string | null): void;
 
   inviteMember(email: string): Promise<InviteMemberResult>;
   removeMember(uid: string): Promise<void>;
@@ -54,6 +60,10 @@ interface TripState {
   addBooking(booking: Omit<Booking, 'id'>): Promise<Booking>;
   updateBooking(id: string, changes: Partial<Omit<Booking, 'id'>>): Promise<void>;
   deleteBooking(id: string): Promise<void>;
+
+  addRoute(route: Omit<Route, 'id' | 'updatedAt'>): Promise<void>;
+  updateRoute(id: string, changes: Partial<Omit<Route, 'id' | 'updatedAt'>>): Promise<void>;
+  deleteRoute(id: string): Promise<void>;
 }
 
 export const useTripStore = create<TripState>((set, get) => ({
@@ -61,8 +71,11 @@ export const useTripStore = create<TripState>((set, get) => ({
   checkpoints: [],
   alternatives: [],
   bookings: [],
+  routes: [],
   activityLog: [],
   selectedId: null,
+  selectedDay: null,
+  selectedRouteId: null,
   undoCheckpoint: null,
   undoAlternative: null,
   repo: null,
@@ -74,6 +87,7 @@ export const useTripStore = create<TripState>((set, get) => ({
     repo.subscribeToCheckpoints(tripId, (checkpoints) => set({ checkpoints }));
     repo.subscribeToAlternatives(tripId, (alternatives) => set({ alternatives }));
     repo.subscribeToBookings(tripId, (bookings) => set({ bookings }));
+    repo.subscribeToRoutes(tripId, (routes) => set({ routes }));
     repo.subscribeToActivityLog(tripId, (activityLog) => set({ activityLog }));
     repo.recordAccess(tripId).catch(() => {});
   },
@@ -105,6 +119,14 @@ export const useTripStore = create<TripState>((set, get) => ({
   selectCheckpoint(id) {
     const { selectedId } = get();
     set({ selectedId: selectedId === id ? null : id });
+  },
+
+  selectDay(day) {
+    set({ selectedDay: day });
+  },
+
+  selectRoute(routeId) {
+    set({ selectedRouteId: routeId });
   },
 
   async addCheckpoint(cp) {
@@ -303,5 +325,46 @@ export const useTripStore = create<TripState>((set, get) => ({
     if (!repo || !tripId) return;
     set({ bookings: bookings.filter((b) => b.id !== id) });
     await repo.deleteBooking(tripId, id);
+  },
+
+  async addRoute(route) {
+    const { repo, tripId, routes } = get();
+    if (!repo || !tripId) return;
+    const optimistic: Route = {
+      ...route,
+      id: `__optimistic-${Date.now()}`,
+      updatedAt: new Date().toISOString(),
+    };
+    set({ routes: [...routes, optimistic] });
+    const saved = await repo.addRoute(tripId, route);
+    set((s) => ({ routes: s.routes.map((r) => (r.id === optimistic.id ? saved : r)) }));
+  },
+
+  async updateRoute(id, changes) {
+    const { repo, tripId, routes } = get();
+    if (!repo || !tripId) return;
+    const prev = routes.find((r) => r.id === id);
+    set({
+      routes: routes.map((r) =>
+        r.id === id ? { ...r, ...changes, updatedAt: new Date().toISOString() } : r
+      ),
+    });
+    try {
+      await repo.updateRoute(tripId, id, changes);
+    } catch {
+      if (prev) set((s) => ({ routes: s.routes.map((r) => (r.id === id ? prev : r)) }));
+    }
+  },
+
+  async deleteRoute(id) {
+    const { repo, tripId, routes } = get();
+    if (!repo || !tripId) return;
+    const prev = routes;
+    set({ routes: routes.filter((r) => r.id !== id) });
+    try {
+      await repo.deleteRoute(tripId, id);
+    } catch {
+      set({ routes: prev });
+    }
   },
 }));

@@ -74,6 +74,58 @@
         "group": "tests",
         "order": 2
       }
+    },
+    {
+      "name": "Debug MCP Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/mcp/dist/index.js",
+      "cwd": "${workspaceFolder}/mcp",
+      "preLaunchTask": "Build MCP",
+      "envFile": "${workspaceFolder}/mcp/.env",
+      "console": "integratedTerminal",
+      "presentation": {
+        "group": "mcp",
+        "order": 1
+      }
+    },
+    {
+      "name": "Debug Functions Tests (emulator)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "--config", "vitest.functions.config.ts"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "FIRESTORE_EMULATOR_HOST": "127.0.0.1:8080",
+        "FIREBASE_AUTH_EMULATOR_HOST": "127.0.0.1:9099",
+        "GCLOUD_PROJECT": "demo-trip-planner-test"
+      },
+      "preLaunchTask": "Start Firebase Emulators (firestore+auth)",
+      "console": "integratedTerminal",
+      "presentation": {
+        "group": "functions",
+        "order": 1
+      }
+    },
+    {
+      "name": "Debug Current Functions Test File (emulator)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "--config", "vitest.functions.config.ts", "${relativeFile}"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "FIRESTORE_EMULATOR_HOST": "127.0.0.1:8080",
+        "FIREBASE_AUTH_EMULATOR_HOST": "127.0.0.1:9099",
+        "GCLOUD_PROJECT": "demo-trip-planner-test"
+      },
+      "preLaunchTask": "Start Firebase Emulators (firestore+auth)",
+      "console": "integratedTerminal",
+      "presentation": {
+        "group": "functions",
+        "order": 2
+      }
     }
   ],
   "compounds": [

@@ -27,6 +27,7 @@ import type {
   Checkpoint,
   Alternative,
   Booking,
+  Route,
   MemberProfile,
   ActivityLogEntry,
   ActivityLogEntryType,
@@ -469,5 +470,55 @@ export class FirebaseTripRepository implements TripRepository {
   // decision) — tracked separately, not implemented here.
   async deleteBooking(_tripId: string, _id: string): Promise<void> {
     throw new Error('Not implemented');
+  }
+
+  subscribeToRoutes(tripId: string, cb: (routes: Route[]) => void): () => void {
+    return onSnapshot(collection(this.db, 'trips', tripId, 'routes'), (snap) => {
+      cb(
+        snap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name,
+          days: d.data().days ?? [],
+          checkpointIds: d.data().checkpointIds ?? [],
+          updatedAt: toIso(d.data().updatedAt),
+        }))
+      );
+    });
+  }
+
+  async addRoute(tripId: string, route: Omit<Route, 'id' | 'updatedAt'>): Promise<Route> {
+    const now = new Date().toISOString();
+    const ref = await addDoc(collection(this.db, 'trips', tripId, 'routes'), {
+      ...route,
+      updatedAt: serverTimestamp(),
+    });
+    void this.logActivity(tripId, { type: 'route_added', entityName: route.name });
+    return { ...route, id: ref.id, updatedAt: now };
+  }
+
+  async updateRoute(
+    tripId: string,
+    id: string,
+    changes: Partial<Omit<Route, 'id' | 'updatedAt'>>
+  ): Promise<void> {
+    await updateDoc(doc(this.db, 'trips', tripId, 'routes', id), {
+      ...changes,
+      updatedAt: serverTimestamp(),
+    });
+    void this.logActivity(tripId, {
+      type: 'route_updated',
+      entityName: changes.name,
+      changedFields: Object.keys(changes),
+    });
+  }
+
+  async deleteRoute(tripId: string, id: string): Promise<void> {
+    const ref = doc(this.db, 'trips', tripId, 'routes', id);
+    const snap = await getDoc(ref);
+    await deleteDoc(ref);
+    void this.logActivity(tripId, {
+      type: 'route_deleted',
+      entityName: snap.exists() ? snap.data().name : undefined,
+    });
   }
 }

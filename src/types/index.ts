@@ -37,6 +37,14 @@ export interface Booking {
   notes?: string;
 }
 
+export interface Route {
+  id: string;
+  name: string;
+  days: string[];
+  checkpointIds: string[];
+  updatedAt: string;
+}
+
 export interface MemberProfile {
   email: string | null;
   displayName: string | null;
@@ -69,7 +77,10 @@ export type ActivityLogEntryType =
   | 'alternative_promoted'
   | 'booking_added'
   | 'booking_updated'
-  | 'booking_deleted';
+  | 'booking_deleted'
+  | 'route_added'
+  | 'route_updated'
+  | 'route_deleted';
 
 export interface ActivityLogEntry {
   id: string;
