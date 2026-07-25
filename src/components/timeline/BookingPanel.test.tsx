@@ -22,11 +22,13 @@ function setupStore(overrides: {
   addBooking?: ReturnType<typeof vi.fn>;
   updateCheckpoint?: ReturnType<typeof vi.fn>;
 }) {
-  const addBookingMock = overrides.addBooking ?? vi.fn().mockResolvedValue({
-    id: 'bk-new',
-    provider: 'ANA',
-    confirmationNumber: 'ANA-001',
-  });
+  const addBookingMock =
+    overrides.addBooking ??
+    vi.fn().mockResolvedValue({
+      id: 'bk-new',
+      provider: 'ANA',
+      confirmationNumber: 'ANA-001',
+    });
   const updateCheckpointMock = overrides.updateCheckpoint ?? vi.fn().mockResolvedValue(undefined);
 
   useTripStore.setState({
@@ -157,6 +159,21 @@ describe('BookingPanel', () => {
     expect(screen.getByText('Window seat reserved')).toBeInTheDocument();
   });
 
+  it('renders markdown booking notes as real elements, not literal syntax', () => {
+    setupStore({ bookings: [{ ...BOOKING, notes: '**bring passport**' }] });
+    renderWithProviders(<BookingPanel checkpointId="cp-1" linkedBookingId="bk-1" />);
+    const strong = screen.getByText('bring passport');
+    expect(strong.tagName).toBe('STRONG');
+  });
+
+  it('the notes field defaults to Write mode and its data-testid still resolves', async () => {
+    setupStore({});
+    const user = userEvent.setup();
+    renderWithProviders(<BookingPanel checkpointId="cp-1" />);
+    await user.click(getAddBookingButton());
+    expect(screen.getByTestId('booking-notes')).toBeInTheDocument();
+  });
+
   it('"Remove link" button calls updateCheckpoint with linkedBookingId: undefined', async () => {
     const updateCheckpointMock = vi.fn().mockResolvedValue(undefined);
     setupStore({ bookings: [BOOKING], updateCheckpoint: updateCheckpointMock });
@@ -181,8 +198,9 @@ describe('BookingPanel', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
     const dialog = screen.getByRole('dialog');
-    const cancelBtn = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button'))
-      .find((b) => /^cancel$/i.test(b.textContent?.trim() ?? ''))!;
+    const cancelBtn = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button')).find((b) =>
+      /^cancel$/i.test(b.textContent?.trim() ?? '')
+    )!;
     await user.click(cancelBtn);
 
     await waitFor(() => {

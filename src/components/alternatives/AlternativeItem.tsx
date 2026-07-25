@@ -17,6 +17,7 @@ import EditIcon from '@mui/icons-material/EditOutlined';
 import type { Alternative } from '../../types';
 import { CheckpointIcon } from '../timeline/CheckpointIcon';
 import { getTagColor } from '../../utils/tagColors';
+import { MarkdownNotes } from '../shared/MarkdownNotes';
 
 interface Props {
   alternative: Alternative;
@@ -69,15 +70,22 @@ export function AlternativeItem({ alternative, onSelect, onPromote, onDelete }: 
           >
             {alternative.name}
           </Typography>
-          {(alternative.location?.label || alternative.notes) && (
+          {alternative.location?.label && (
             <Typography
               variant="caption"
               color="text.secondary"
               component="div"
               sx={{ whiteSpace: 'normal' }}
             >
-              {alternative.location?.label ?? alternative.notes}
+              {alternative.location.label}
             </Typography>
+          )}
+          {alternative.notes && (
+            <MarkdownNotes
+              notes={alternative.notes}
+              variant="caption"
+              sx={{ whiteSpace: 'normal' }}
+            />
           )}
           {alternative.tags && alternative.tags.length > 0 && (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>

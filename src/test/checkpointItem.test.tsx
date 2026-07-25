@@ -107,6 +107,13 @@ describe('CheckpointItem', () => {
     expect(screen.queryByText('JL 005, seat 32A')).not.toBeInTheDocument();
   });
 
+  it('renders markdown in notes as real elements, not literal syntax', () => {
+    renderItem({ checkpoint: { ...BASE, notes: 'window seat, **arrive early**' } });
+    const strong = screen.getByText('arrive early');
+    expect(strong.tagName).toBe('STRONG');
+    expect(screen.queryByText('**arrive early**')).not.toBeInTheDocument();
+  });
+
   it('does not render end-time dash when endTime is absent', () => {
     const noEnd = { ...BASE, endTime: undefined };
     renderItem({ checkpoint: noEnd });
@@ -194,6 +201,15 @@ describe('CheckpointItem', () => {
     it('renders when notes contain kanji', () => {
       renderItem({ checkpoint: { ...BASE, name: 'Narita', notes: '成田空港' } });
       expect(screen.getByRole('button', { name: /show reading/i })).toBeInTheDocument();
+    });
+
+    it('reveals the notes reading alongside markdown-rendered notes', async () => {
+      convertMock.mockResolvedValueOnce('Narita Kūkō');
+      renderItem({ checkpoint: { ...BASE, name: 'Narita', notes: '**成田空港**' } });
+      const strong = screen.getByText('成田空港');
+      expect(strong.tagName).toBe('STRONG');
+      fireEvent.click(screen.getByRole('button', { name: /show reading/i }));
+      await waitFor(() => expect(screen.getByText('(Narita Kūkō)')).toBeInTheDocument());
     });
 
     it('reveals the romaji reading inline, in parentheses, on click', async () => {

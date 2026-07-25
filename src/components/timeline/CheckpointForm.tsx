@@ -23,6 +23,7 @@ import { hasKanji } from '../../utils/kanjiReading';
 import { useRomanizeIntoField, romanizeStatusMessage } from '../../hooks/useRomanizeIntoField';
 import { buildGoogleMapsUrl, buildGoogleSearchUrl } from '../../utils/googleMapsLink';
 import { isHttpUrl } from '../../utils/url';
+import { MarkdownNotesField } from '../shared/MarkdownNotesField';
 
 const TYPES: { value: CheckpointType; label: string }[] = [
   { value: 'flight', label: 'Flight' },
@@ -269,15 +270,7 @@ export function CheckpointForm({
             ))}
         </Box>
 
-        <TextField
-          label="Notes"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          size="small"
-          fullWidth
-          multiline
-          rows={2}
-        />
+        <MarkdownNotesField label="Notes" value={notes} onChange={setNotes} />
 
         <Autocomplete
           multiple
