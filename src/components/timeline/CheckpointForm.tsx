@@ -1,17 +1,33 @@
 import { useState } from 'react';
 import {
-  Box, TextField, MenuItem, Button, Stack, Typography,
+  Box,
+  TextField,
+  MenuItem,
+  Button,
+  Stack,
+  Typography,
+  IconButton,
+  InputAdornment,
+  Link,
 } from '@mui/material';
+import TranslateIcon from '@mui/icons-material/TranslateOutlined';
+import MapIcon from '@mui/icons-material/Map';
+import SearchIcon from '@mui/icons-material/Search';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import type { Checkpoint, CheckpointType } from '../../types';
 import { BookingPanel } from './BookingPanel';
+import { hasKanji } from '../../utils/kanjiReading';
+import { useRomanizeIntoField, romanizeStatusMessage } from '../../hooks/useRomanizeIntoField';
+import { buildGoogleMapsUrl, buildGoogleSearchUrl } from '../../utils/googleMapsLink';
+import { isHttpUrl } from '../../utils/url';
 
 const TYPES: { value: CheckpointType; label: string }[] = [
   { value: 'flight', label: 'Flight' },
-  { value: 'train',  label: 'Train' },
-  { value: 'metro',  label: 'Metro' },
-  { value: 'hotel',  label: 'Hotel' },
-  { value: 'poi',    label: 'Point of Interest' },
-  { value: 'other',  label: 'Other' },
+  { value: 'train', label: 'Train' },
+  { value: 'metro', label: 'Metro' },
+  { value: 'hotel', label: 'Hotel' },
+  { value: 'poi', label: 'Point of Interest' },
+  { value: 'other', label: 'Other' },
 ];
 
 type FormData = Omit<Checkpoint, 'id' | 'updatedAt'>;
@@ -27,7 +43,7 @@ interface Props {
 function toDatetimeLocal(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function fromDatetimeLocal(s: string): string {
@@ -38,22 +54,36 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
   const [type, setType] = useState<CheckpointType>(initial?.type ?? 'poi');
   const [name, setName] = useState(initial?.name ?? '');
   const [startTime, setStartTime] = useState(
-    initial?.startTime ? toDatetimeLocal(initial.startTime) : (defaultStartTime ? toDatetimeLocal(defaultStartTime) : '')
+    initial?.startTime
+      ? toDatetimeLocal(initial.startTime)
+      : defaultStartTime
+        ? toDatetimeLocal(defaultStartTime)
+        : ''
   );
   const [endTime, setEndTime] = useState(initial?.endTime ? toDatetimeLocal(initial.endTime) : '');
   const [locLabel, setLocLabel] = useState(initial?.location?.label ?? '');
   const [locLat, setLocLat] = useState(initial?.location ? String(initial.location.lat) : '');
   const [locLng, setLocLng] = useState(initial?.location ? String(initial.location.lng) : '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [websiteUrl, setWebsiteUrl] = useState(initial?.websiteUrl ?? '');
+  const {
+    status: nameRomanizeStatus,
+    romanize: romanizeName,
+    resetStatus: resetNameRomanizeStatus,
+  } = useRomanizeIntoField(setName);
+
+  const lat = parseFloat(locLat);
+  const lng = parseFloat(locLng);
+  const location =
+    locLat && locLng && !isNaN(lat) && !isNaN(lng)
+      ? { lat, lng, label: locLabel || undefined }
+      : undefined;
+  const mapsFallbackQuery = locLabel.trim() || name.trim();
+  const showMapsLink = Boolean(location || mapsFallbackQuery);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !startTime) return;
-    const lat = parseFloat(locLat);
-    const lng = parseFloat(locLng);
-    const location = locLat && locLng && !isNaN(lat) && !isNaN(lng)
-      ? { lat, lng, label: locLabel || undefined }
-      : undefined;
     onSave({
       type,
       name: name.trim(),
@@ -61,40 +91,67 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
       endTime: endTime ? fromDatetimeLocal(endTime) : undefined,
       location,
       notes: notes.trim() || undefined,
+      websiteUrl: websiteUrl.trim() || undefined,
       linkedBookingId: initial?.linkedBookingId,
     });
   }
 
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
-      {title && <Typography variant="h6" mb={2}>{title}</Typography>}
+      {title && (
+        <Typography variant="h6" mb={2}>
+          {title}
+        </Typography>
+      )}
       <Stack spacing={2}>
         <TextField
           select
           label="Type"
           value={type}
-          onChange={e => setType(e.target.value as CheckpointType)}
+          onChange={(e) => setType(e.target.value as CheckpointType)}
           size="small"
           fullWidth
         >
-          {TYPES.map(t => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
+          {TYPES.map((t) => (
+            <MenuItem key={t.value} value={t.value}>
+              {t.label}
+            </MenuItem>
+          ))}
         </TextField>
 
         <TextField
           label="Name"
           value={name}
-          onChange={e => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            resetNameRomanizeStatus();
+          }}
           required
           size="small"
           fullWidth
           autoFocus
+          helperText={romanizeStatusMessage(nameRomanizeStatus)}
+          InputProps={{
+            endAdornment: hasKanji(name) && nameRomanizeStatus !== 'done' && (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  aria-label="Insert romaji reading"
+                  disabled={nameRomanizeStatus === 'loading'}
+                  onClick={() => romanizeName(name)}
+                >
+                  <TranslateIcon fontSize="small" />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
         />
 
         <TextField
           label="Start time"
           type="datetime-local"
           value={startTime}
-          onChange={e => setStartTime(e.target.value)}
+          onChange={(e) => setStartTime(e.target.value)}
           required
           size="small"
           fullWidth
@@ -105,7 +162,7 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
           label="End time (optional)"
           type="datetime-local"
           value={endTime}
-          onChange={e => setEndTime(e.target.value)}
+          onChange={(e) => setEndTime(e.target.value)}
           size="small"
           fullWidth
           InputLabelProps={{ shrink: true }}
@@ -114,7 +171,7 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
         <TextField
           label="Location label"
           value={locLabel}
-          onChange={e => setLocLabel(e.target.value)}
+          onChange={(e) => setLocLabel(e.target.value)}
           size="small"
           fullWidth
           placeholder="e.g. Shinjuku, Tokyo"
@@ -124,7 +181,7 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
           <TextField
             label="Lat"
             value={locLat}
-            onChange={e => setLocLat(e.target.value)}
+            onChange={(e) => setLocLat(e.target.value)}
             size="small"
             type="number"
             inputProps={{ step: 'any' }}
@@ -132,17 +189,69 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
           <TextField
             label="Lng"
             value={locLng}
-            onChange={e => setLocLng(e.target.value)}
+            onChange={(e) => setLocLng(e.target.value)}
             size="small"
             type="number"
             inputProps={{ step: 'any' }}
           />
         </Stack>
 
+        <Stack direction="row" spacing={2}>
+          {showMapsLink && (
+            <Link
+              href={buildGoogleMapsUrl(location, mapsFallbackQuery)}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="body2"
+              sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
+            >
+              <MapIcon fontSize="small" /> Google Maps
+            </Link>
+          )}
+          {name.trim() && (
+            <Link
+              href={buildGoogleSearchUrl(name.trim())}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="body2"
+              sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
+            >
+              <SearchIcon fontSize="small" /> Google Search
+            </Link>
+          )}
+        </Stack>
+
+        <Box>
+          <TextField
+            label="Website"
+            type="url"
+            value={websiteUrl}
+            onChange={(e) => setWebsiteUrl(e.target.value)}
+            size="small"
+            fullWidth
+          />
+          {websiteUrl.trim() &&
+            (isHttpUrl(websiteUrl) ? (
+              <Link
+                href={websiteUrl.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="body2"
+                sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}
+              >
+                <OpenInNewIcon fontSize="small" /> Visit website
+              </Link>
+            ) : (
+              <Typography variant="caption" color="text.secondary" component="p" mt={0.5}>
+                Won't be clickable until it starts with http:// or https://
+              </Typography>
+            ))}
+        </Box>
+
         <TextField
           label="Notes"
           value={notes}
-          onChange={e => setNotes(e.target.value)}
+          onChange={(e) => setNotes(e.target.value)}
           size="small"
           fullWidth
           multiline
@@ -150,16 +259,17 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
         />
 
         <Stack direction="row" spacing={1} justifyContent="flex-end">
-          <Button onClick={onCancel} size="small">Cancel</Button>
-          <Button type="submit" variant="contained" size="small">Save</Button>
+          <Button onClick={onCancel} size="small">
+            Cancel
+          </Button>
+          <Button type="submit" variant="contained" size="small">
+            Save
+          </Button>
         </Stack>
       </Stack>
 
       {initial?.id && (
-        <BookingPanel
-          checkpointId={initial.id}
-          linkedBookingId={initial.linkedBookingId}
-        />
+        <BookingPanel checkpointId={initial.id} linkedBookingId={initial.linkedBookingId} />
       )}
     </Box>
   );

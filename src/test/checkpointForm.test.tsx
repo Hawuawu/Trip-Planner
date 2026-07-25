@@ -1,11 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CheckpointForm } from '../components/timeline/CheckpointForm';
 import { renderWithProviders, resetStores } from './helpers';
 
+const { convertMock } = vi.hoisted(() => ({ convertMock: vi.fn() }));
+
+vi.mock('@sglkc/kuroshiro', () => ({
+  default: vi.fn().mockImplementation(function KuroshiroMock() {
+    return {
+      init: vi.fn().mockResolvedValue(undefined),
+      convert: convertMock,
+    };
+  }),
+}));
+
+vi.mock('@sglkc/kuroshiro-analyzer-kuromoji', () => ({
+  default: vi.fn().mockImplementation(function KuromojiAnalyzerMock() {
+    return {};
+  }),
+}));
+
 beforeEach(() => {
   resetStores();
+  convertMock.mockReset();
 });
 
 // MUI TextField with label="Name" required renders "Name *" in the label,
@@ -21,6 +39,10 @@ function _getStartTimeInput() {
 
 function getNotesInput() {
   return screen.getByRole('textbox', { name: /notes/i });
+}
+
+function getWebsiteInput() {
+  return screen.getByRole('textbox', { name: /website/i });
 }
 
 describe('CheckpointForm', () => {
@@ -219,5 +241,164 @@ describe('CheckpointForm', () => {
     );
     fireEvent.submit(document.querySelectorAll('form')[1]!);
     expect(onSave.mock.calls[0][0].type).toBe('flight');
+  });
+
+  describe('Google Maps / Search links and website field', () => {
+    it('hides the Maps and Search links when name and location are both empty', () => {
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      expect(screen.queryByRole('link', { name: /google maps/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /google search/i })).not.toBeInTheDocument();
+    });
+
+    it('Maps link uses the name as a fallback query when no location is set', () => {
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getNameInput(), { target: { value: 'Fushimi Inari' } });
+      const link = screen.getByRole('link', { name: /google maps/i });
+      expect(link.getAttribute('href')).toBe(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Fushimi Inari')}`
+      );
+    });
+
+    it('Maps link uses lat,lng once both coordinate fields are filled', () => {
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getNameInput(), { target: { value: 'Fushimi Inari' } });
+      const numberInputs = Array.from(
+        document.querySelectorAll<HTMLInputElement>('input[type="number"]')
+      );
+      fireEvent.change(numberInputs[0], { target: { value: '34.9671' } });
+      fireEvent.change(numberInputs[1], { target: { value: '135.7727' } });
+      const link = screen.getByRole('link', { name: /google maps/i });
+      expect(link.getAttribute('href')).toBe(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('34.9671,135.7727')}`
+      );
+    });
+
+    it('Search link reflects the live name and is absent when name is empty', () => {
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      expect(screen.queryByRole('link', { name: /google search/i })).not.toBeInTheDocument();
+      fireEvent.change(getNameInput(), { target: { value: 'Ichiran Ramen' } });
+      const link = screen.getByRole('link', { name: /google search/i });
+      expect(link.getAttribute('href')).toBe(
+        `https://www.google.com/search?q=${encodeURIComponent('Ichiran Ramen')}`
+      );
+    });
+
+    it('pre-fills the website field from initial.websiteUrl', () => {
+      renderWithProviders(
+        <CheckpointForm
+          initial={{
+            type: 'poi',
+            name: 'Sensoji',
+            startTime: '2026-10-02T15:00:00.000Z',
+            websiteUrl: 'https://www.senso-ji.jp',
+          }}
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+      expect(getWebsiteInput()).toHaveValue('https://www.senso-ji.jp');
+    });
+
+    it('round-trips websiteUrl through onSave, omitting it when blank', () => {
+      const onSave = vi.fn();
+      renderWithProviders(
+        <CheckpointForm
+          onSave={onSave}
+          onCancel={vi.fn()}
+          defaultStartTime="2026-10-01T14:00:00.000Z"
+        />
+      );
+      fireEvent.change(getNameInput(), { target: { value: 'No Website' } });
+      fireEvent.submit(document.querySelector('form')!);
+      expect(onSave.mock.calls[0][0].websiteUrl).toBeUndefined();
+    });
+
+    it('includes websiteUrl when the field has content', () => {
+      const onSave = vi.fn();
+      renderWithProviders(
+        <CheckpointForm
+          onSave={onSave}
+          onCancel={vi.fn()}
+          defaultStartTime="2026-10-01T14:00:00.000Z"
+        />
+      );
+      fireEvent.change(getNameInput(), { target: { value: 'With Website' } });
+      fireEvent.change(getWebsiteInput(), { target: { value: 'https://example.com' } });
+      fireEvent.submit(document.querySelector('form')!);
+      expect(onSave.mock.calls[0][0].websiteUrl).toBe('https://example.com');
+    });
+
+    it('does not render a clickable "Visit website" link for a javascript: URL', () => {
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getWebsiteInput(), { target: { value: 'javascript:alert(1)' } });
+      expect(screen.queryByRole('link', { name: /visit website/i })).not.toBeInTheDocument();
+      expect(screen.getByText(/won't be clickable/i)).toBeInTheDocument();
+    });
+
+    it('renders a clickable "Visit website" link for a valid https URL', () => {
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getWebsiteInput(), { target: { value: 'https://example.com' } });
+      const link = screen.getByRole('link', { name: /visit website/i });
+      expect(link.getAttribute('href')).toBe('https://example.com');
+    });
+  });
+
+  describe('romanize affordance on the Name field', () => {
+    it('does not render when the name has no kanji', () => {
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getNameInput(), { target: { value: 'Narita Airport' } });
+      expect(
+        screen.queryByRole('button', { name: /insert romaji reading/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('renders once the name contains kanji', () => {
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getNameInput(), { target: { value: '成田空港' } });
+      expect(screen.getByRole('button', { name: /insert romaji reading/i })).toBeInTheDocument();
+    });
+
+    it('appends the romaji reading directly into the Name field on click', async () => {
+      convertMock.mockResolvedValueOnce('narita kūkō');
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getNameInput(), { target: { value: '成田空港' } });
+      fireEvent.click(screen.getByRole('button', { name: /insert romaji reading/i }));
+      await waitFor(() => expect(getNameInput()).toHaveValue('成田空港 (Narita-Kūkō)'));
+    });
+
+    it('hides the insert button after the reading has been inserted', async () => {
+      convertMock.mockResolvedValueOnce('narita kūkō');
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getNameInput(), { target: { value: '成田空港' } });
+      fireEvent.click(screen.getByRole('button', { name: /insert romaji reading/i }));
+      await waitFor(() => expect(getNameInput()).toHaveValue('成田空港 (Narita-Kūkō)'));
+      expect(
+        screen.queryByRole('button', { name: /insert romaji reading/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the insert button again once the name is edited further', async () => {
+      convertMock.mockResolvedValueOnce('narita kūkō');
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getNameInput(), { target: { value: '成田空港' } });
+      fireEvent.click(screen.getByRole('button', { name: /insert romaji reading/i }));
+      await waitFor(() => expect(getNameInput()).toHaveValue('成田空港 (Narita-Kūkō)'));
+      fireEvent.change(getNameInput(), { target: { value: '成田空港駅' } });
+      expect(screen.getByRole('button', { name: /insert romaji reading/i })).toBeInTheDocument();
+    });
+
+    it('shows an offline-unavailable message without altering the Name field', async () => {
+      convertMock.mockRejectedValueOnce(new Error('network error'));
+      const originalOnLine = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+      renderWithProviders(<CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} />);
+      fireEvent.change(getNameInput(), { target: { value: '成田空港' } });
+      fireEvent.click(screen.getByRole('button', { name: /insert romaji reading/i }));
+      await waitFor(() =>
+        expect(screen.getByText('Translation unavailable offline')).toBeInTheDocument()
+      );
+      expect(getNameInput()).toHaveValue('成田空港');
+      if (originalOnLine) Object.defineProperty(navigator, 'onLine', originalOnLine);
+    });
   });
 });

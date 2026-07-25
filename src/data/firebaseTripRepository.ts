@@ -283,6 +283,7 @@ export class FirebaseTripRepository implements TripRepository {
         endTime: d.data().endTime ? toIso(d.data().endTime) : undefined,
         location: d.data().location ?? undefined,
         notes: d.data().notes ?? undefined,
+        websiteUrl: d.data().websiteUrl ?? undefined,
         linkedBookingId: d.data().linkedBookingId ?? undefined,
         updatedAt: toIso(d.data().updatedAt),
       }));
@@ -429,6 +430,7 @@ export class FirebaseTripRepository implements TripRepository {
       startTime,
       ...(alt.location && { location: alt.location }),
       ...(alt.notes && { notes: alt.notes }),
+      ...(alt.websiteUrl && { websiteUrl: alt.websiteUrl }),
       updatedAt: serverTimestamp(),
     });
     await deleteDoc(altRef);
