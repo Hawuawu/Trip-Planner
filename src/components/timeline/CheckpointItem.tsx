@@ -28,6 +28,7 @@ import { getTagColor } from '../../utils/tagColors';
 import { hasKanji } from '../../utils/kanjiReading';
 import { useKanjiReading } from '../../hooks/useKanjiReading';
 import { InlineReading } from '../InlineReading';
+import { MarkdownNotes } from '../shared/MarkdownNotes';
 
 interface Props {
   checkpoint: Checkpoint;
@@ -132,14 +133,10 @@ export function CheckpointItem({
               {checkpoint.endTime && ` – ${formatTime(checkpoint.endTime)}`}
             </Typography>
             {checkpoint.notes && (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 0.25, fontStyle: 'italic' }}
-              >
-                {checkpoint.notes}
+              <Box sx={{ mt: 0.25 }}>
+                <MarkdownNotes notes={checkpoint.notes} variant="body2" />
                 {revealed && notesHasKanji && <InlineReading state={notesReading} />}
-              </Typography>
+              </Box>
             )}
             {checkpoint.tags && checkpoint.tags.length > 0 && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
