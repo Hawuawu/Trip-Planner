@@ -8,11 +8,17 @@ import {
   Typography,
   IconButton,
   InputAdornment,
+  Link,
 } from '@mui/material';
 import TranslateIcon from '@mui/icons-material/TranslateOutlined';
+import MapIcon from '@mui/icons-material/Map';
+import SearchIcon from '@mui/icons-material/Search';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import type { Alternative, CheckpointType } from '../../types';
 import { hasKanji } from '../../utils/kanjiReading';
 import { useRomanizeIntoField, romanizeStatusMessage } from '../../hooks/useRomanizeIntoField';
+import { buildGoogleMapsUrl, buildGoogleSearchUrl } from '../../utils/googleMapsLink';
+import { isHttpUrl } from '../../utils/url';
 
 const TYPES: { value: CheckpointType; label: string }[] = [
   { value: 'flight', label: 'Flight' },
@@ -39,26 +45,31 @@ export function AlternativeForm({ initial, onSave, onCancel, title }: Props) {
   const [locLat, setLocLat] = useState(initial?.location ? String(initial.location.lat) : '');
   const [locLng, setLocLng] = useState(initial?.location ? String(initial.location.lng) : '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [websiteUrl, setWebsiteUrl] = useState(initial?.websiteUrl ?? '');
   const {
     status: nameRomanizeStatus,
     romanize: romanizeName,
     resetStatus: resetNameRomanizeStatus,
   } = useRomanizeIntoField(setName);
 
+  const lat = parseFloat(locLat);
+  const lng = parseFloat(locLng);
+  const location =
+    locLat && locLng && !isNaN(lat) && !isNaN(lng)
+      ? { lat, lng, label: locLabel || undefined }
+      : undefined;
+  const mapsFallbackQuery = locLabel.trim() || name.trim();
+  const showMapsLink = Boolean(location || mapsFallbackQuery);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    const lat = parseFloat(locLat);
-    const lng = parseFloat(locLng);
-    const location =
-      locLat && locLng && !isNaN(lat) && !isNaN(lng)
-        ? { lat, lng, label: locLabel || undefined }
-        : undefined;
     onSave({
       type,
       name: name.trim(),
       location,
       notes: notes.trim() || undefined,
+      websiteUrl: websiteUrl.trim() || undefined,
     });
   }
 
@@ -141,6 +152,58 @@ export function AlternativeForm({ initial, onSave, onCancel, title }: Props) {
             inputProps={{ step: 'any' }}
           />
         </Stack>
+
+        <Stack direction="row" spacing={2}>
+          {showMapsLink && (
+            <Link
+              href={buildGoogleMapsUrl(location, mapsFallbackQuery)}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="body2"
+              sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
+            >
+              <MapIcon fontSize="small" /> Google Maps
+            </Link>
+          )}
+          {name.trim() && (
+            <Link
+              href={buildGoogleSearchUrl(name.trim())}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="body2"
+              sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
+            >
+              <SearchIcon fontSize="small" /> Google Search
+            </Link>
+          )}
+        </Stack>
+
+        <Box>
+          <TextField
+            label="Website"
+            type="url"
+            value={websiteUrl}
+            onChange={(e) => setWebsiteUrl(e.target.value)}
+            size="small"
+            fullWidth
+          />
+          {websiteUrl.trim() &&
+            (isHttpUrl(websiteUrl) ? (
+              <Link
+                href={websiteUrl.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="body2"
+                sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}
+              >
+                <OpenInNewIcon fontSize="small" /> Visit website
+              </Link>
+            ) : (
+              <Typography variant="caption" color="text.secondary" component="p" mt={0.5}>
+                Won't be clickable until it starts with http:// or https://
+              </Typography>
+            ))}
+        </Box>
 
         <TextField
           label="Notes"
