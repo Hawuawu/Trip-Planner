@@ -19,6 +19,7 @@ import { MapZoomControl } from './MapZoomControl';
 import { MapOrientationBall } from './MapOrientationBall';
 import { MAX_PITCH } from './mapConstants';
 import { getPoiAtPoint, type Poi } from './poi';
+import { visibleCheckpoints } from '../../utils/checkpointVisibility';
 
 const JAPAN_CENTER = { longitude: 139.69, latitude: 35.68, zoom: 10 };
 
@@ -122,9 +123,11 @@ interface Props {
 
 export function MapView({ onPoiSelected }: Props) {
   const [mapStyle, setMapStyle] = useState<string>(STYLES[0].url);
-  const { checkpoints, selectedId, selectCheckpoint } = useTripStore();
+  const { checkpoints, selectedId, selectCheckpoint, selectedDay, selectedRouteId, routes } =
+    useTripStore();
 
-  const withLocation = checkpoints.filter((c) => c.location);
+  const visible = visibleCheckpoints(checkpoints, { selectedDay, selectedRouteId, routes });
+  const withLocation = visible.filter((c) => c.location);
 
   const routeGeoJSON: FeatureCollection<LineString> = {
     type: 'FeatureCollection',

@@ -16,18 +16,24 @@ import { CheckpointItem } from './CheckpointItem';
 import { CheckpointForm } from './CheckpointForm';
 import { ListControls } from '../shared/ListControls';
 import { collectAllTags, matchesAnyTag } from '../../utils/tags';
+import { visibleCheckpoints } from '../../utils/checkpointVisibility';
+import { formatDayLabel } from '../../utils/date';
 
 interface Props {
   openAddSignal?: number;
+  onSaved?: (message: string) => void;
 }
 
-export function TimelineView({ openAddSignal }: Props) {
+export function TimelineView({ openAddSignal, onSaved }: Props) {
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down('sm'));
 
   const {
     checkpoints,
     alternatives,
+    routes,
+    selectedDay,
+    selectedRouteId,
     selectedId,
     selectCheckpoint,
     addCheckpoint,
@@ -87,20 +93,35 @@ export function TimelineView({ openAddSignal }: Props) {
     [checkpoints, alternatives]
   );
 
+  const dayRouteFiltered = useMemo(
+    () => visibleCheckpoints(checkpoints, { selectedDay, selectedRouteId, routes }),
+    [checkpoints, selectedDay, selectedRouteId, routes]
+  );
+
   const filteredCheckpoints = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return checkpoints.filter((cp) => {
+    return dayRouteFiltered.filter((cp) => {
       const matchesSearch =
         !q || [cp.name, cp.location?.label, cp.notes].some((f) => f?.toLowerCase().includes(q));
       return matchesSearch && matchesAnyTag(cp.tags, selectedTags);
     });
-  }, [checkpoints, search, selectedTags]);
+  }, [dayRouteFiltered, search, selectedTags]);
 
   function toggleTag(tag: string) {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   }
+
+  const activeRoute = selectedRouteId ? routes.find((r) => r.id === selectedRouteId) : undefined;
+  const activeSelectionLabel =
+    activeRoute && selectedDay
+      ? `"${activeRoute.name}" on ${formatDayLabel(selectedDay)}`
+      : activeRoute
+        ? `"${activeRoute.name}"`
+        : selectedDay
+          ? formatDayLabel(selectedDay)
+          : null;
 
   const drawerContent = adding ? (
     <CheckpointForm
@@ -110,6 +131,7 @@ export function TimelineView({ openAddSignal }: Props) {
       onSave={async (data) => {
         await addCheckpoint(data);
         setAdding(false);
+        onSaved?.(`Checkpoint "${data.name}" added.`);
       }}
       onCancel={() => setAdding(false)}
     />
@@ -121,6 +143,7 @@ export function TimelineView({ openAddSignal }: Props) {
       onSave={async (data) => {
         await updateCheckpoint(editing.id, data);
         setEditingId(null);
+        onSaved?.(`Checkpoint "${data.name}" updated.`);
       }}
       onCancel={() => setEditingId(null)}
     />
@@ -152,6 +175,10 @@ export function TimelineView({ openAddSignal }: Props) {
             Add first checkpoint
           </Button>
         </Box>
+      ) : dayRouteFiltered.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+          No checkpoints on {activeSelectionLabel}.
+        </Typography>
       ) : (
         <>
           <ListControls
@@ -165,7 +192,7 @@ export function TimelineView({ openAddSignal }: Props) {
 
           {filteredCheckpoints.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-              No checkpoints match "{search}".
+              No checkpoints match {search ? `"${search}"` : 'the selected tags'}.
             </Typography>
           ) : (
             <Timeline sx={{ p: 0, m: 0, pt: 2, pl: 2 }}>
@@ -206,7 +233,8 @@ export function TimelineView({ openAddSignal }: Props) {
                         // `i` is an index into `filteredCheckpoints`, but
                         // defaultStartForInsert looks up positions in the
                         // full `checkpoints` array — re-resolve by id so an
-                        // active search/tag filter can't skew the insert time.
+                        // active search/tag/day/route filter can't skew the
+                        // insert time.
                         setInsertAfterIndex(checkpoints.findIndex((c) => c.id === cp.id));
                         setAdding(true);
                       }}

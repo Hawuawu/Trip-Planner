@@ -150,6 +150,19 @@ describe('AlternativesShelf', () => {
     });
   });
 
+  it('calls onSaved with a confirmation message after adding', async () => {
+    const onSaved = vi.fn();
+    renderWithProviders(<AlternativesShelf onSaved={onSaved} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /add alternative/i }));
+    await userEvent.type(screen.getByRole('textbox', { name: /name/i }), 'Test Place');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalledWith('Alternative "Test Place" added.');
+    });
+  });
+
   it('includes location when lat and lng are provided', async () => {
     renderWithProviders(<AlternativesShelf />);
     const spy = vi.spyOn(useTripStore.getState(), 'addAlternative');
@@ -209,6 +222,20 @@ describe('AlternativesShelf', () => {
     await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     expect(spy).toHaveBeenCalledWith('a1', expect.objectContaining({ name: 'teamLab Planets' }));
+  });
+
+  it('calls onSaved with a confirmation message after editing', async () => {
+    useTripStore.setState({ alternatives: SEED_ALTS });
+    const onSaved = vi.fn();
+    renderWithProviders(<AlternativesShelf onSaved={onSaved} />);
+
+    await userEvent.click(screen.getAllByRole('button', { name: /edit alternative/i })[0]);
+    const nameInput = screen.getByRole('textbox', { name: /name/i });
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'teamLab Planets');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    expect(onSaved).toHaveBeenCalledWith('Alternative "teamLab Planets" updated.');
   });
 
   // ── Alternatives list ────────────────────────────────────────────────────

@@ -123,6 +123,9 @@ promote_alternative(tripId, alternativeId, startTime)
 
 list_bookings(tripId)
 add_booking(tripId, booking), update_booking(tripId, bookingId, changes)
+
+list_routes(tripId), get_route(tripId, routeId)
+add_route(tripId, route), update_route(tripId, routeId, changes)
 ```
 
 `checkpoint`/`alternative` inputs also accept an optional `tags: string[]`
@@ -140,6 +143,16 @@ the timeline, matching the web app's own `promoteAlternative` — confirmed
 with the user that the "no delete tools" decision is about standalone
 `delete_*` tools, not this already-shipped promotion behavior's side
 effect.
+
+`route` (trip-planner's day selector + routes feature, #53/#54) is a named,
+day-scoped subset of a trip's checkpoints — `{ name, days: string[]
+("YYYY-MM-DD" keys), checkpointIds: string[] }`. A checkpoint may belong to
+more than one route at once (e.g. a shared hotel stop on both a "Nature
+route" and an "Anime route" covering the same day). No `delete_route` tool,
+matching every other entity's no-delete scope. Day-filtering itself (#53)
+needed no MCP tool changes at all — `list_checkpoints` already returns full
+`startTime` timestamps, so the calling model can already reason about which
+checkpoints fall on a given day without a new filter parameter.
 
 Not tool-mapped: `recordAccess` and the various `subscribeToX` methods
 collapse into one-shot `listX` reads (an MCP tool call is a single

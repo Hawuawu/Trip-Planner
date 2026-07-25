@@ -15,7 +15,7 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import type { Auth } from 'firebase/auth';
-import type { Trip, Checkpoint, Alternative, Booking, MemberProfile } from '../types.js';
+import type { Trip, Checkpoint, Alternative, Booking, Route, MemberProfile } from '../types.js';
 
 function toIso(val: unknown): string {
   if (val instanceof Timestamp) return val.toDate().toISOString();
@@ -64,6 +64,16 @@ function toAlternative(id: string, d: Record<string, unknown>): Alternative {
 
 function toBooking(id: string, d: Record<string, unknown>): Booking {
   return { id, ...(d as Omit<Booking, 'id'>) };
+}
+
+function toRoute(id: string, d: Record<string, unknown>): Route {
+  return {
+    id,
+    name: d.name as string,
+    days: (d.days as string[]) ?? [],
+    checkpointIds: (d.checkpointIds as string[]) ?? [],
+    updatedAt: toIso(d.updatedAt),
+  };
 }
 
 // One-shot Firestore reads/writes (getDoc/getDocs, not onSnapshot) — an MCP
@@ -259,5 +269,36 @@ export class FirebaseClientTripRepository {
     changes: Partial<Omit<Booking, 'id'>>
   ): Promise<void> {
     await updateDoc(doc(this.db, 'trips', tripId, 'bookings', id), { ...changes });
+  }
+
+  async listRoutes(tripId: string): Promise<Route[]> {
+    const snap = await getDocs(collection(this.db, 'trips', tripId, 'routes'));
+    return snap.docs.map((d) => toRoute(d.id, d.data()));
+  }
+
+  async getRoute(tripId: string, routeId: string): Promise<Route> {
+    const snap = await getDoc(doc(this.db, 'trips', tripId, 'routes', routeId));
+    if (!snap.exists()) throw new Error(`Route ${routeId} not found`);
+    return toRoute(snap.id, snap.data());
+  }
+
+  async addRoute(tripId: string, route: Omit<Route, 'id' | 'updatedAt'>): Promise<Route> {
+    const now = new Date().toISOString();
+    const ref = await addDoc(collection(this.db, 'trips', tripId, 'routes'), {
+      ...route,
+      updatedAt: serverTimestamp(),
+    });
+    return { ...route, id: ref.id, updatedAt: now };
+  }
+
+  async updateRoute(
+    tripId: string,
+    id: string,
+    changes: Partial<Omit<Route, 'id' | 'updatedAt'>>
+  ): Promise<void> {
+    await updateDoc(doc(this.db, 'trips', tripId, 'routes', id), {
+      ...changes,
+      updatedAt: serverTimestamp(),
+    });
   }
 }

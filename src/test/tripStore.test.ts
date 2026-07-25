@@ -59,6 +59,16 @@ function makeMockRepo(overrides: Partial<TripRepository> = {}): TripRepository {
     }),
     updateBooking: vi.fn().mockResolvedValue(undefined),
     deleteBooking: vi.fn().mockResolvedValue(undefined),
+    subscribeToRoutes: vi.fn().mockReturnValue(() => {}),
+    addRoute: vi.fn().mockResolvedValue({
+      id: 'route-saved-1',
+      name: 'New Route',
+      days: ['2026-10-05'],
+      checkpointIds: [],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    }),
+    updateRoute: vi.fn().mockResolvedValue(undefined),
+    deleteRoute: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -83,6 +93,12 @@ describe('tripStore — init', () => {
     useTripStore.getState().init('trip-1', repo);
     expect(repo.subscribeToActivityLog).toHaveBeenCalledWith('trip-1', expect.any(Function));
     expect(repo.recordAccess).toHaveBeenCalledWith('trip-1');
+  });
+
+  it('subscribes to routes on init', () => {
+    const repo = makeMockRepo();
+    useTripStore.getState().init('trip-1', repo);
+    expect(repo.subscribeToRoutes).toHaveBeenCalledWith('trip-1', expect.any(Function));
   });
 
   it('sets tripId and repo in state', () => {
@@ -152,6 +168,34 @@ describe('tripStore — selectCheckpoint', () => {
     useTripStore.getState().selectCheckpoint('cp-1');
     useTripStore.getState().selectCheckpoint('cp-2');
     expect(useTripStore.getState().selectedId).toBe('cp-2');
+  });
+});
+
+describe('tripStore — selectDay / selectRoute', () => {
+  it('selectDay sets selectedDay without touching an active route', () => {
+    useTripStore.setState({ selectedRouteId: 'route-1' });
+    useTripStore.getState().selectDay('2026-10-05');
+    expect(useTripStore.getState().selectedDay).toBe('2026-10-05');
+    expect(useTripStore.getState().selectedRouteId).toBe('route-1');
+  });
+
+  it('selectDay(null) clears the day filter', () => {
+    useTripStore.setState({ selectedDay: '2026-10-05' });
+    useTripStore.getState().selectDay(null);
+    expect(useTripStore.getState().selectedDay).toBeNull();
+  });
+
+  it('selectRoute sets selectedRouteId without touching an active day', () => {
+    useTripStore.setState({ selectedDay: '2026-10-05' });
+    useTripStore.getState().selectRoute('route-1');
+    expect(useTripStore.getState().selectedRouteId).toBe('route-1');
+    expect(useTripStore.getState().selectedDay).toBe('2026-10-05');
+  });
+
+  it('selectRoute(null) clears the active route', () => {
+    useTripStore.setState({ selectedRouteId: 'route-1' });
+    useTripStore.getState().selectRoute(null);
+    expect(useTripStore.getState().selectedRouteId).toBeNull();
   });
 });
 
@@ -536,5 +580,108 @@ describe('tripStore — bookings', () => {
     const repo = makeMockRepo();
     useTripStore.getState().init('trip-1', repo);
     expect(repo.subscribeToBookings).toHaveBeenCalledWith('trip-1', expect.any(Function));
+  });
+});
+
+describe('tripStore — routes', () => {
+  it('addRoute appends optimistically then replaces with saved', async () => {
+    let resolveAdd!: (r: import('../types').Route) => void;
+    const addRoute = vi.fn(
+      () =>
+        new Promise<import('../types').Route>((res) => {
+          resolveAdd = res;
+        })
+    );
+    const repo = makeMockRepo({ addRoute });
+    useTripStore.setState({ repo, tripId: 'trip-1', routes: [] });
+
+    const promise = useTripStore
+      .getState()
+      .addRoute({ name: 'Nature route', days: ['2026-10-05'], checkpointIds: ['cp-1'] });
+
+    const { routes } = useTripStore.getState();
+    expect(routes).toHaveLength(1);
+    expect(routes[0].id).toMatch(/__optimistic/);
+    expect(routes[0].name).toBe('Nature route');
+
+    resolveAdd({
+      id: 'route-real',
+      name: 'Nature route',
+      days: ['2026-10-05'],
+      checkpointIds: ['cp-1'],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    await promise;
+
+    expect(useTripStore.getState().routes[0].id).toBe('route-real');
+  });
+
+  it('updateRoute applies changes optimistically', async () => {
+    const repo = makeMockRepo();
+    const route: import('../types').Route = {
+      id: 'route-1',
+      name: 'Before',
+      days: ['2026-10-05'],
+      checkpointIds: [],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    useTripStore.setState({ repo, tripId: 'trip-1', routes: [route] });
+
+    await useTripStore.getState().updateRoute('route-1', { name: 'After' });
+
+    expect(useTripStore.getState().routes[0].name).toBe('After');
+    expect(repo.updateRoute).toHaveBeenCalledWith('trip-1', 'route-1', { name: 'After' });
+  });
+
+  it('updateRoute rolls back when repo throws', async () => {
+    const updateRoute = vi.fn().mockRejectedValue(new Error('network'));
+    const repo = makeMockRepo({ updateRoute });
+    const route: import('../types').Route = {
+      id: 'route-1',
+      name: 'Original',
+      days: ['2026-10-05'],
+      checkpointIds: [],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    useTripStore.setState({ repo, tripId: 'trip-1', routes: [route] });
+
+    await useTripStore.getState().updateRoute('route-1', { name: 'Failed' });
+
+    expect(useTripStore.getState().routes[0].name).toBe('Original');
+  });
+
+  it('deleteRoute removes the entry optimistically', async () => {
+    const repo = makeMockRepo();
+    const route: import('../types').Route = {
+      id: 'route-1',
+      name: 'To Remove',
+      days: ['2026-10-05'],
+      checkpointIds: [],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    useTripStore.setState({ repo, tripId: 'trip-1', routes: [route] });
+
+    await useTripStore.getState().deleteRoute('route-1');
+
+    expect(useTripStore.getState().routes).toHaveLength(0);
+    expect(repo.deleteRoute).toHaveBeenCalledWith('trip-1', 'route-1');
+  });
+
+  it('deleteRoute restores the route when the repo throws', async () => {
+    const deleteRoute = vi.fn().mockRejectedValue(new Error('network'));
+    const repo = makeMockRepo({ deleteRoute });
+    const route: import('../types').Route = {
+      id: 'route-1',
+      name: 'Restored',
+      days: ['2026-10-05'],
+      checkpointIds: [],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    useTripStore.setState({ repo, tripId: 'trip-1', routes: [route] });
+
+    await useTripStore.getState().deleteRoute('route-1');
+
+    expect(useTripStore.getState().routes).toHaveLength(1);
+    expect(useTripStore.getState().routes[0].name).toBe('Restored');
   });
 });

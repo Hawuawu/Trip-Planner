@@ -24,9 +24,10 @@ import type { Alternative } from '../../types';
 interface Props {
   openAddSignal?: number;
   prefill?: Partial<Omit<Alternative, 'id'>> | null;
+  onSaved?: (message: string) => void;
 }
 
-export function AlternativesShelf({ openAddSignal, prefill }: Props) {
+export function AlternativesShelf({ openAddSignal, prefill, onSaved }: Props) {
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -102,6 +103,7 @@ export function AlternativesShelf({ openAddSignal, prefill }: Props) {
         addAlternative(data);
         setAddOpen(false);
         setAddPrefill(undefined);
+        onSaved?.(`Alternative "${data.name}" added.`);
       }}
       onCancel={() => {
         setAddOpen(false);
@@ -116,6 +118,7 @@ export function AlternativesShelf({ openAddSignal, prefill }: Props) {
       onSave={(data) => {
         updateAlternative(editing.id, data);
         setEditingId(null);
+        onSaved?.(`Alternative "${data.name}" updated.`);
       }}
       onCancel={() => setEditingId(null)}
     />

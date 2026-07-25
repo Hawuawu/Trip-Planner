@@ -6,6 +6,11 @@
       "type": "npm",
       "script": "dev",
       "isBackground": true,
+      "options": {
+        "env": {
+          "VITE_USE_LOCAL": "true"
+        }
+      },
       "problemMatcher": {
         "owner": "vite",
         "pattern": {
@@ -34,6 +39,41 @@
         "reveal": "always",
         "panel": "dedicated",
         "group": "tests"
+      }
+    },
+    {
+      "label": "Build MCP",
+      "type": "npm",
+      "script": "build",
+      "path": "mcp",
+      "problemMatcher": ["$tsc"],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "group": "mcp"
+      }
+    },
+    {
+      "label": "Start Firebase Emulators (firestore+auth)",
+      "type": "shell",
+      "command": "npx firebase-tools emulators:start --only firestore,auth",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "firebase-emulators",
+        "pattern": {
+          "regexp": "^(Error.*)$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting emulators",
+          "endsPattern": "All emulators ready|It is now safe to connect"
+        }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "group": "functions"
       }
     }
   ]
