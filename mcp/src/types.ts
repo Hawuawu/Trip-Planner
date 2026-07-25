@@ -3,8 +3,7 @@
 // need the coordination overhead of a shared @trip-planner/types package.
 // Keep in sync manually if trip-planner's schema changes.
 
-export type CheckpointType =
-  "flight" | "train" | "metro" | "hotel" | "poi" | "other";
+export type CheckpointType = 'flight' | 'train' | 'metro' | 'hotel' | 'poi' | 'other';
 
 export interface Location {
   lat: number;
@@ -20,6 +19,7 @@ export interface Checkpoint {
   endTime?: string;
   location?: Location;
   notes?: string;
+  tags?: string[];
   linkedBookingId?: string;
   updatedAt: string;
 }
@@ -30,6 +30,7 @@ export interface Alternative {
   name: string;
   location?: Location;
   notes?: string;
+  tags?: string[];
 }
 
 export interface Booking {

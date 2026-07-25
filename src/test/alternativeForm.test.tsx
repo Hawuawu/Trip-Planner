@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AlternativeForm } from '../components/alternatives/AlternativeForm';
 import { renderWithProviders } from './helpers';
 
@@ -129,5 +130,46 @@ describe('AlternativeForm romanize affordance', () => {
     expect(
       screen.queryByRole('button', { name: /insert romaji reading/i })
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('AlternativeForm tags', () => {
+  it('pre-fills tags as chips from initial.tags', () => {
+    renderWithProviders(
+      <AlternativeForm
+        initial={{ type: 'poi', name: 'Nishiki Market', tags: ['food'] }}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+    expect(screen.getByText('food')).toBeInTheDocument();
+  });
+
+  it('suggests existingTags in the tags input', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <AlternativeForm onSave={vi.fn()} onCancel={vi.fn()} existingTags={['rainy-day']} />
+    );
+    await user.click(screen.getByRole('combobox', { name: /tags/i }));
+    expect(screen.getByRole('option', { name: 'rainy-day' })).toBeInTheDocument();
+  });
+
+  it('includes newly typed tags in onSave, trimmed and deduped', () => {
+    const onSave = vi.fn();
+    renderWithProviders(<AlternativeForm onSave={onSave} onCancel={vi.fn()} />);
+    fireEvent.change(getNameInput(), { target: { value: 'Tagged Alt' } });
+    const tagsInput = screen.getByRole('combobox', { name: /tags/i });
+    fireEvent.change(tagsInput, { target: { value: '  food  ' } });
+    fireEvent.keyDown(tagsInput, { key: 'Enter' });
+    fireEvent.submit(document.querySelector('form')!);
+    expect(onSave.mock.calls[0][0].tags).toEqual(['food']);
+  });
+
+  it('omits tags entirely when none are entered', () => {
+    const onSave = vi.fn();
+    renderWithProviders(<AlternativeForm onSave={onSave} onCancel={vi.fn()} />);
+    fireEvent.change(getNameInput(), { target: { value: 'No Tags' } });
+    fireEvent.submit(document.querySelector('form')!);
+    expect(onSave.mock.calls[0][0].tags).toBeUndefined();
   });
 });

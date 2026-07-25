@@ -78,6 +78,13 @@ function validateCommonFields(
     ok = false;
   }
 
+  if (raw.tags !== undefined) {
+    if (!Array.isArray(raw.tags) || !raw.tags.every((t) => typeof t === 'string')) {
+      errors.push({ path, message: '"tags" must be a list of strings' });
+      ok = false;
+    }
+  }
+
   if (raw.location !== undefined && raw.location !== null) {
     if (typeof raw.location !== 'object' || Array.isArray(raw.location)) {
       errors.push({ path, message: '"location" must be an object with "lat"/"lng"' });
@@ -143,6 +150,7 @@ function buildCheckpoint(raw: Record<string, unknown>): ImportableCheckpoint {
     ...(buildLocation(raw) ? { location: buildLocation(raw) } : {}),
     ...(typeof raw.notes === 'string' ? { notes: raw.notes } : {}),
     ...(typeof raw.websiteUrl === 'string' ? { websiteUrl: raw.websiteUrl } : {}),
+    ...(Array.isArray(raw.tags) ? { tags: raw.tags as string[] } : {}),
   };
 }
 
@@ -153,6 +161,7 @@ function buildAlternative(raw: Record<string, unknown>): ImportableAlternative {
     ...(buildLocation(raw) ? { location: buildLocation(raw) } : {}),
     ...(typeof raw.notes === 'string' ? { notes: raw.notes } : {}),
     ...(typeof raw.websiteUrl === 'string' ? { websiteUrl: raw.websiteUrl } : {}),
+    ...(Array.isArray(raw.tags) ? { tags: raw.tags as string[] } : {}),
   };
 }
 

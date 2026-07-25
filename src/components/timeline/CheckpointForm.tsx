@@ -9,6 +9,8 @@ import {
   IconButton,
   InputAdornment,
   Link,
+  Autocomplete,
+  Chip,
 } from '@mui/material';
 import TranslateIcon from '@mui/icons-material/TranslateOutlined';
 import MapIcon from '@mui/icons-material/Map';
@@ -16,6 +18,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import type { Checkpoint, CheckpointType } from '../../types';
 import { BookingPanel } from './BookingPanel';
+import { getTagColor } from '../../utils/tagColors';
 import { hasKanji } from '../../utils/kanjiReading';
 import { useRomanizeIntoField, romanizeStatusMessage } from '../../hooks/useRomanizeIntoField';
 import { buildGoogleMapsUrl, buildGoogleSearchUrl } from '../../utils/googleMapsLink';
@@ -35,6 +38,7 @@ type FormData = Omit<Checkpoint, 'id' | 'updatedAt'>;
 interface Props {
   initial?: Partial<FormData> & { id?: string };
   defaultStartTime?: string;
+  existingTags?: string[];
   onSave(data: FormData): void;
   onCancel(): void;
   title?: string;
@@ -50,7 +54,14 @@ function fromDatetimeLocal(s: string): string {
   return new Date(s).toISOString();
 }
 
-export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, title }: Props) {
+export function CheckpointForm({
+  initial,
+  defaultStartTime,
+  existingTags,
+  onSave,
+  onCancel,
+  title,
+}: Props) {
   const [type, setType] = useState<CheckpointType>(initial?.type ?? 'poi');
   const [name, setName] = useState(initial?.name ?? '');
   const [startTime, setStartTime] = useState(
@@ -66,6 +77,7 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
   const [locLng, setLocLng] = useState(initial?.location ? String(initial.location.lng) : '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [websiteUrl, setWebsiteUrl] = useState(initial?.websiteUrl ?? '');
+  const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
   const {
     status: nameRomanizeStatus,
     romanize: romanizeName,
@@ -84,6 +96,7 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !startTime) return;
+    const cleanedTags = Array.from(new Set(tags.map((t) => t.trim()).filter(Boolean)));
     onSave({
       type,
       name: name.trim(),
@@ -92,6 +105,7 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
       location,
       notes: notes.trim() || undefined,
       websiteUrl: websiteUrl.trim() || undefined,
+      tags: cleanedTags.length > 0 ? cleanedTags : undefined,
       linkedBookingId: initial?.linkedBookingId,
     });
   }
@@ -256,6 +270,33 @@ export function CheckpointForm({ initial, defaultStartTime, onSave, onCancel, ti
           fullWidth
           multiline
           rows={2}
+        />
+
+        <Autocomplete
+          multiple
+          freeSolo
+          size="small"
+          options={existingTags ?? []}
+          value={tags}
+          onChange={(_e, newValue) => setTags(newValue)}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => {
+              const color = getTagColor(option);
+              return (
+                <Chip
+                  size="small"
+                  label={option}
+                  sx={{
+                    bgcolor: color.bg,
+                    color: color.fg,
+                    '& .MuiChip-deleteIcon': { color: color.fg, opacity: 0.7 },
+                  }}
+                  {...getTagProps({ index })}
+                />
+              );
+            })
+          }
+          renderInput={(params) => <TextField {...params} label="Tags" placeholder="Add tag…" />}
         />
 
         <Stack direction="row" spacing={1} justifyContent="flex-end">

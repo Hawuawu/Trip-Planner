@@ -9,12 +9,15 @@ import {
   IconButton,
   InputAdornment,
   Link,
+  Autocomplete,
+  Chip,
 } from '@mui/material';
 import TranslateIcon from '@mui/icons-material/TranslateOutlined';
 import MapIcon from '@mui/icons-material/Map';
 import SearchIcon from '@mui/icons-material/Search';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import type { Alternative, CheckpointType } from '../../types';
+import { getTagColor } from '../../utils/tagColors';
 import { hasKanji } from '../../utils/kanjiReading';
 import { useRomanizeIntoField, romanizeStatusMessage } from '../../hooks/useRomanizeIntoField';
 import { buildGoogleMapsUrl, buildGoogleSearchUrl } from '../../utils/googleMapsLink';
@@ -33,12 +36,13 @@ type FormData = Omit<Alternative, 'id'>;
 
 interface Props {
   initial?: Partial<FormData>;
+  existingTags?: string[];
   onSave(data: FormData): void;
   onCancel(): void;
   title?: string;
 }
 
-export function AlternativeForm({ initial, onSave, onCancel, title }: Props) {
+export function AlternativeForm({ initial, existingTags, onSave, onCancel, title }: Props) {
   const [type, setType] = useState<CheckpointType>(initial?.type ?? 'poi');
   const [name, setName] = useState(initial?.name ?? '');
   const [locLabel, setLocLabel] = useState(initial?.location?.label ?? '');
@@ -46,6 +50,7 @@ export function AlternativeForm({ initial, onSave, onCancel, title }: Props) {
   const [locLng, setLocLng] = useState(initial?.location ? String(initial.location.lng) : '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [websiteUrl, setWebsiteUrl] = useState(initial?.websiteUrl ?? '');
+  const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
   const {
     status: nameRomanizeStatus,
     romanize: romanizeName,
@@ -64,12 +69,14 @@ export function AlternativeForm({ initial, onSave, onCancel, title }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    const cleanedTags = Array.from(new Set(tags.map((t) => t.trim()).filter(Boolean)));
     onSave({
       type,
       name: name.trim(),
       location,
       notes: notes.trim() || undefined,
       websiteUrl: websiteUrl.trim() || undefined,
+      tags: cleanedTags.length > 0 ? cleanedTags : undefined,
     });
   }
 
@@ -213,6 +220,33 @@ export function AlternativeForm({ initial, onSave, onCancel, title }: Props) {
           fullWidth
           multiline
           rows={2}
+        />
+
+        <Autocomplete
+          multiple
+          freeSolo
+          size="small"
+          options={existingTags ?? []}
+          value={tags}
+          onChange={(_e, newValue) => setTags(newValue)}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => {
+              const color = getTagColor(option);
+              return (
+                <Chip
+                  size="small"
+                  label={option}
+                  sx={{
+                    bgcolor: color.bg,
+                    color: color.fg,
+                    '& .MuiChip-deleteIcon': { color: color.fg, opacity: 0.7 },
+                  }}
+                  {...getTagProps({ index })}
+                />
+              );
+            })
+          }
+          renderInput={(params) => <TextField {...params} label="Tags" placeholder="Add tag…" />}
         />
 
         <Stack direction="row" spacing={1} justifyContent="flex-end">

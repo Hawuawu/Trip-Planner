@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -14,6 +14,8 @@ import AddIcon from '@mui/icons-material/Add';
 import { useTripStore } from '../../store/tripStore';
 import { CheckpointItem } from './CheckpointItem';
 import { CheckpointForm } from './CheckpointForm';
+import { ListControls } from '../shared/ListControls';
+import { collectAllTags, matchesAnyTag } from '../../utils/tags';
 
 interface Props {
   openAddSignal?: number;
@@ -25,6 +27,7 @@ export function TimelineView({ openAddSignal }: Props) {
 
   const {
     checkpoints,
+    alternatives,
     selectedId,
     selectCheckpoint,
     addCheckpoint,
@@ -38,6 +41,8 @@ export function TimelineView({ openAddSignal }: Props) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [insertAfterIndex, setInsertAfterIndex] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const now = useRef(new Date().toISOString());
   const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
   const checkpointsRef = useRef(checkpoints);
@@ -77,10 +82,31 @@ export function TimelineView({ openAddSignal }: Props) {
 
   const editing = editingId ? checkpoints.find((c) => c.id === editingId) : null;
 
+  const allTags = useMemo(
+    () => collectAllTags(checkpoints, alternatives),
+    [checkpoints, alternatives]
+  );
+
+  const filteredCheckpoints = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return checkpoints.filter((cp) => {
+      const matchesSearch =
+        !q || [cp.name, cp.location?.label, cp.notes].some((f) => f?.toLowerCase().includes(q));
+      return matchesSearch && matchesAnyTag(cp.tags, selectedTags);
+    });
+  }, [checkpoints, search, selectedTags]);
+
+  function toggleTag(tag: string) {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  }
+
   const drawerContent = adding ? (
     <CheckpointForm
       title="Add checkpoint"
       defaultStartTime={defaultStartForInsert(insertAfterIndex)}
+      existingTags={allTags}
       onSave={async (data) => {
         await addCheckpoint(data);
         setAdding(false);
@@ -91,6 +117,7 @@ export function TimelineView({ openAddSignal }: Props) {
     <CheckpointForm
       title="Edit checkpoint"
       initial={editing}
+      existingTags={allTags}
       onSave={async (data) => {
         await updateCheckpoint(editing.id, data);
         setEditingId(null);
@@ -126,51 +153,72 @@ export function TimelineView({ openAddSignal }: Props) {
           </Button>
         </Box>
       ) : (
-        <Timeline sx={{ p: 0, m: 0, pt: 2, pl: 2 }}>
-          {checkpoints.map((cp, i) => (
-            <Box
-              key={cp.id}
-              ref={(el) => {
-                if (el) itemRefs.current.set(cp.id, el as HTMLElement);
-                else itemRefs.current.delete(cp.id);
-              }}
-            >
-              <CheckpointItem
-                checkpoint={cp}
-                isActive={cp.id === activeId}
-                isSelected={cp.id === selectedId}
-                isLast={i === checkpoints.length - 1}
-                onSelect={() => selectCheckpoint(cp.id === selectedId ? null : cp.id)}
-                onEdit={() => {
-                  selectCheckpoint(cp.id);
-                  setEditingId(cp.id);
-                }}
-                onDelete={() => deleteCheckpoint(cp.id)}
-              />
-              <Box sx={{ display: 'flex', justifyContent: 'center', my: -1 }}>
-                <IconButton
-                  size="small"
-                  aria-label="Add checkpoint here"
-                  sx={{
-                    width: 20,
-                    height: 20,
-                    opacity: 0,
-                    '&:hover': { opacity: 1 },
-                    color: 'text.secondary',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                  onClick={() => {
-                    setInsertAfterIndex(i);
-                    setAdding(true);
+        <>
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search checkpoints…"
+            allTags={allTags}
+            selectedTags={selectedTags}
+            onToggleTag={toggleTag}
+          />
+
+          {filteredCheckpoints.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+              No checkpoints match "{search}".
+            </Typography>
+          ) : (
+            <Timeline sx={{ p: 0, m: 0, pt: 2, pl: 2 }}>
+              {filteredCheckpoints.map((cp, i) => (
+                <Box
+                  key={cp.id}
+                  ref={(el) => {
+                    if (el) itemRefs.current.set(cp.id, el as HTMLElement);
+                    else itemRefs.current.delete(cp.id);
                   }}
                 >
-                  <AddIcon sx={{ fontSize: 14 }} />
-                </IconButton>
-              </Box>
-            </Box>
-          ))}
-        </Timeline>
+                  <CheckpointItem
+                    checkpoint={cp}
+                    isActive={cp.id === activeId}
+                    isSelected={cp.id === selectedId}
+                    isLast={i === filteredCheckpoints.length - 1}
+                    onSelect={() => selectCheckpoint(cp.id === selectedId ? null : cp.id)}
+                    onEdit={() => {
+                      selectCheckpoint(cp.id);
+                      setEditingId(cp.id);
+                    }}
+                    onDelete={() => deleteCheckpoint(cp.id)}
+                  />
+                  <Box sx={{ display: 'flex', justifyContent: 'center', my: -1 }}>
+                    <IconButton
+                      size="small"
+                      aria-label="Add checkpoint here"
+                      sx={{
+                        width: 20,
+                        height: 20,
+                        opacity: 0,
+                        '&:hover': { opacity: 1 },
+                        color: 'text.secondary',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                      onClick={() => {
+                        // `i` is an index into `filteredCheckpoints`, but
+                        // defaultStartForInsert looks up positions in the
+                        // full `checkpoints` array — re-resolve by id so an
+                        // active search/tag filter can't skew the insert time.
+                        setInsertAfterIndex(checkpoints.findIndex((c) => c.id === cp.id));
+                        setAdding(true);
+                      }}
+                    >
+                      <AddIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Box>
+                </Box>
+              ))}
+            </Timeline>
+          )}
+        </>
       )}
 
       <Drawer

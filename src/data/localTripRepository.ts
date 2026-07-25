@@ -30,6 +30,7 @@ const SEED_CHECKPOINTS: Checkpoint[] = [
     startTime: '2026-10-01T14:00:00.000Z',
     endTime: '2026-10-02T17:00:00.000Z',
     notes: 'JL 005, seat 32A',
+    tags: ['long-haul'],
     updatedAt: now,
   },
   {
@@ -65,6 +66,7 @@ const SEED_CHECKPOINTS: Checkpoint[] = [
     name: 'Fushimi Inari-taisha',
     startTime: '2026-10-06T08:00:00.000Z',
     location: { lat: 34.9671, lng: 135.7727, label: 'Fushimi, Kyoto' },
+    tags: ['must-see', 'outdoors'],
     updatedAt: now,
   },
   {
@@ -85,12 +87,14 @@ const SEED_ALTERNATIVES: Alternative[] = [
     name: 'teamLab Borderless',
     notes: 'Azabudai Hills, Tokyo',
     location: { lat: 35.6591, lng: 139.7138, label: 'Azabudai Hills, Tokyo' },
+    tags: ['rainy-day', 'must-see'],
   },
   {
     id: 'a2',
     type: 'poi',
     name: 'Nishiki Market',
     location: { lat: 35.0053, lng: 135.7659, label: 'Nishiki, Kyoto' },
+    tags: ['food'],
   },
 ];
 
@@ -412,6 +416,7 @@ export class LocalTripRepository implements TripRepository {
       location: alt.location,
       notes: alt.notes,
       websiteUrl: alt.websiteUrl,
+      tags: alt.tags,
     });
     await this.deleteAlternative(tripId, alternativeId);
     this.pushActivity(tripId, { type: 'alternative_promoted', entityName: alt.name });

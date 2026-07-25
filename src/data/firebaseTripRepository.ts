@@ -284,6 +284,7 @@ export class FirebaseTripRepository implements TripRepository {
         location: d.data().location ?? undefined,
         notes: d.data().notes ?? undefined,
         websiteUrl: d.data().websiteUrl ?? undefined,
+        tags: d.data().tags ?? undefined,
         linkedBookingId: d.data().linkedBookingId ?? undefined,
         updatedAt: toIso(d.data().updatedAt),
       }));
@@ -431,6 +432,7 @@ export class FirebaseTripRepository implements TripRepository {
       ...(alt.location && { location: alt.location }),
       ...(alt.notes && { notes: alt.notes }),
       ...(alt.websiteUrl && { websiteUrl: alt.websiteUrl }),
+      ...(alt.tags && alt.tags.length > 0 && { tags: alt.tags }),
       updatedAt: serverTimestamp(),
     });
     await deleteDoc(altRef);
