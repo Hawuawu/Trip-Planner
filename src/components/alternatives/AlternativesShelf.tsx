@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogContent,
   TextField,
+  MenuItem,
   DialogActions,
   Drawer,
   Snackbar,
@@ -23,13 +24,45 @@ import type { Alternative } from '../../types';
 
 interface Props {
   openAddSignal?: number;
-  prefill?: Partial<Omit<Alternative, 'id'>> | null;
+  prefill?: Partial<Omit<Alternative, 'id' | 'createdAt'>> | null;
   onSaved?: (message: string) => void;
   onError?: (message: string) => void;
 }
 
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
+}
+
+type SortBy = 'name' | 'date';
+type SortDir = 'asc' | 'desc';
+type SortOption = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc';
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'date-desc', label: 'Date added (Newest first)' },
+  { value: 'date-asc', label: 'Date added (Oldest first)' },
+  { value: 'name-asc', label: 'Name (A–Z)' },
+  { value: 'name-desc', label: 'Name (Z–A)' },
+];
+
+// Missing createdAt (legacy items predating #76) always sorts last, in
+// both directions — so it's a distinct branch evaluated before the
+// direction flip, not a plain string-compare negation.
+function compareAlternatives(
+  a: Alternative,
+  b: Alternative,
+  sortBy: SortBy,
+  sortDir: SortDir
+): number {
+  if (sortBy === 'name') {
+    const cmp = a.name.localeCompare(b.name);
+    return sortDir === 'asc' ? cmp : -cmp;
+  }
+  const aHas = a.createdAt !== undefined;
+  const bHas = b.createdAt !== undefined;
+  if (aHas !== bHas) return aHas ? -1 : 1;
+  if (!aHas && !bHas) return 0;
+  const cmp = a.createdAt!.localeCompare(b.createdAt!);
+  return sortDir === 'asc' ? cmp : -cmp;
 }
 
 export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: Props) {
@@ -50,12 +83,14 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
 
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [promoteId, setPromoteId] = useState<string | null>(null);
   const [promoteTime, setPromoteTime] = useState('');
   const [addOpen, setAddOpen] = useState(false);
-  const [addPrefill, setAddPrefill] = useState<Partial<Omit<Alternative, 'id'>> | undefined>(
-    undefined
-  );
+  const [addPrefill, setAddPrefill] = useState<
+    Partial<Omit<Alternative, 'id' | 'createdAt'>> | undefined
+  >(undefined);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const promoting = alternatives.find((a) => a.id === promoteId);
@@ -86,10 +121,21 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
     });
   }, [alternatives, search, selectedTags]);
 
+  const sorted = useMemo(
+    () => [...filtered].sort((a, b) => compareAlternatives(a, b, sortBy, sortDir)),
+    [filtered, sortBy, sortDir]
+  );
+
   function toggleTag(tag: string) {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
+  }
+
+  function handleSortChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const [by, dir] = (e.target.value as SortOption).split('-') as [SortBy, SortDir];
+    setSortBy(by);
+    setSortDir(dir);
   }
 
   function handlePromote() {
@@ -173,10 +219,26 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
             allTags={allTags}
             selectedTags={selectedTags}
             onToggleTag={toggleTag}
+            extraControls={
+              <TextField
+                select
+                label="Sort by"
+                value={`${sortBy}-${sortDir}`}
+                onChange={handleSortChange}
+                size="small"
+                fullWidth
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            }
           />
 
           <Box sx={{ px: 2, pb: 2, flex: 1 }}>
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
               <Typography
                 variant="body2"
                 color="text.secondary"
@@ -185,7 +247,7 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
                 No alternatives match "{search}".
               </Typography>
             ) : (
-              filtered.map((alt) => (
+              sorted.map((alt) => (
                 <AlternativeItem
                   key={alt.id}
                   alternative={alt}

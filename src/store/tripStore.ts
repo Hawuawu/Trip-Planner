@@ -45,8 +45,11 @@ interface TripState {
 
   reorderCheckpoints(fromIndex: number, toIndex: number): Promise<void>;
 
-  addAlternative(alt: Omit<Alternative, 'id'>): Promise<void>;
-  updateAlternative(id: string, changes: Partial<Omit<Alternative, 'id'>>): Promise<void>;
+  addAlternative(alt: Omit<Alternative, 'id' | 'createdAt'>): Promise<void>;
+  updateAlternative(
+    id: string,
+    changes: Partial<Omit<Alternative, 'id' | 'createdAt'>>
+  ): Promise<void>;
   deleteAlternative(id: string): Promise<void>;
   undoDeleteAlternative(): Promise<void>;
   clearUndoAlternative(): void;
@@ -54,7 +57,7 @@ interface TripState {
 
   importCheckpoints(items: {
     checkpoints: Omit<Checkpoint, 'id' | 'updatedAt'>[];
-    alternatives: Omit<Alternative, 'id'>[];
+    alternatives: Omit<Alternative, 'id' | 'createdAt'>[];
   }): Promise<void>;
 
   addBooking(booking: Omit<Booking, 'id'>): Promise<Booking>;
@@ -239,7 +242,11 @@ export const useTripStore = create<TripState>((set, get) => ({
   async addAlternative(alt) {
     const { repo, tripId, alternatives } = get();
     if (!repo || !tripId) return;
-    const optimistic: Alternative = { ...alt, id: `__optimistic-${Date.now()}` };
+    const optimistic: Alternative = {
+      ...alt,
+      id: `__optimistic-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
     set({ alternatives: [...alternatives, optimistic] });
     const saved = await repo.addAlternative(tripId, alt);
     set((s) => ({ alternatives: s.alternatives.map((a) => (a.id === optimistic.id ? saved : a)) }));
@@ -282,7 +289,7 @@ export const useTripStore = create<TripState>((set, get) => ({
     const { repo, tripId, undoAlternative } = get();
     if (!repo || !tripId || !undoAlternative) return;
     set({ undoAlternative: null });
-    const { id: _id, ...alt } = undoAlternative;
+    const { id: _id, createdAt: _createdAt, ...alt } = undoAlternative;
     await get().addAlternative(alt);
   },
 

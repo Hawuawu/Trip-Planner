@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../../test/helpers';
 import { AlternativesShelf } from './AlternativesShelf';
@@ -21,6 +21,14 @@ const SEED_ALTS = [
     location: { lat: 35.6878, lng: 139.6922, label: 'Shinjuku, Tokyo' },
   },
 ];
+
+// The default sort (Name A→Z) means an item's position in the rendered list
+// isn't its position in SEED_ALTS — scope queries to the specific item's
+// container (found via its name text) instead of indexing into a flat
+// getAllBy* list.
+function itemContainer(name: string): HTMLElement {
+  return screen.getByText(name).closest('div')!.parentElement!.parentElement!;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -204,7 +212,11 @@ describe('AlternativesShelf', () => {
     useTripStore.setState({ alternatives: SEED_ALTS });
     renderWithProviders(<AlternativesShelf />);
 
-    await userEvent.click(screen.getAllByRole('button', { name: /edit alternative/i })[0]);
+    await userEvent.click(
+      within(itemContainer('teamLab Borderless')).getAllByRole('button', {
+        name: /edit alternative/i,
+      })[0]
+    );
 
     expect(screen.getByRole('heading', { name: /edit alternative/i })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /name/i })).toHaveValue('teamLab Borderless');
@@ -215,7 +227,11 @@ describe('AlternativesShelf', () => {
     const spy = vi.spyOn(useTripStore.getState(), 'updateAlternative');
     renderWithProviders(<AlternativesShelf />);
 
-    await userEvent.click(screen.getAllByRole('button', { name: /edit alternative/i })[0]);
+    await userEvent.click(
+      within(itemContainer('teamLab Borderless')).getAllByRole('button', {
+        name: /edit alternative/i,
+      })[0]
+    );
     const nameInput = screen.getByRole('textbox', { name: /name/i });
     await userEvent.clear(nameInput);
     await userEvent.type(nameInput, 'teamLab Planets');
@@ -229,7 +245,11 @@ describe('AlternativesShelf', () => {
     const onSaved = vi.fn();
     renderWithProviders(<AlternativesShelf onSaved={onSaved} />);
 
-    await userEvent.click(screen.getAllByRole('button', { name: /edit alternative/i })[0]);
+    await userEvent.click(
+      within(itemContainer('teamLab Borderless')).getAllByRole('button', {
+        name: /edit alternative/i,
+      })[0]
+    );
     const nameInput = screen.getByRole('textbox', { name: /name/i });
     await userEvent.clear(nameInput);
     await userEvent.type(nameInput, 'teamLab Planets');
@@ -323,10 +343,10 @@ describe('AlternativesShelf', () => {
     const spy = vi.spyOn(useTripStore.getState(), 'deleteAlternative').mockResolvedValue();
     renderWithProviders(<AlternativesShelf />);
 
-    const deleteBtns = screen
-      .getAllByTestId('DeleteOutlineIcon')
-      .map((icon) => icon.closest('button')!);
-    await userEvent.click(deleteBtns[0]);
+    const deleteBtn = within(itemContainer('teamLab Borderless'))
+      .getByTestId('DeleteOutlineIcon')
+      .closest('button')!;
+    await userEvent.click(deleteBtn);
 
     expect(spy).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: /^delete$/i }));
@@ -374,8 +394,8 @@ describe('AlternativesShelf', () => {
     useTripStore.setState({ alternatives: SEED_ALTS });
     renderWithProviders(<AlternativesShelf />);
 
-    const promoteBtns = screen.getAllByTitle('Add to timeline');
-    await userEvent.click(promoteBtns[0]);
+    const promoteBtn = within(itemContainer('teamLab Borderless')).getByTitle('Add to timeline');
+    await userEvent.click(promoteBtn);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     // Dialog title includes the alternative name
@@ -387,7 +407,9 @@ describe('AlternativesShelf', () => {
     const spy = vi.spyOn(useTripStore.getState(), 'promoteAlternative').mockResolvedValue();
     renderWithProviders(<AlternativesShelf />);
 
-    await userEvent.click(screen.getAllByTitle('Add to timeline')[0]);
+    await userEvent.click(
+      within(itemContainer('teamLab Borderless')).getByTitle('Add to timeline')
+    );
     const timeInput = screen.getByLabelText(/start time/i);
     fireEvent.change(timeInput, { target: { value: '2026-10-07T10:00' } });
     await userEvent.click(screen.getByRole('button', { name: /^add$/i }));
@@ -406,6 +428,130 @@ describe('AlternativesShelf', () => {
     expect(spy).not.toHaveBeenCalled();
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  // ── Sort control ─────────────────────────────────────────────────────────
+
+  describe('Sort control', () => {
+    // The sort picker now lives inside ListControls's collapsible "Search &
+    // filter" section (per user request — it should share the same expand
+    // toggle as search/tags, not be a separately-always-visible control), so
+    // it must be expanded before it's interactable.
+    async function expandControls() {
+      await userEvent.click(screen.getByRole('button', { name: /show search and filters/i }));
+    }
+
+    async function selectSortOption(label: RegExp) {
+      await userEvent.click(screen.getByRole('combobox', { name: /sort by/i }));
+      await userEvent.click(screen.getByRole('option', { name: label }));
+    }
+
+    it('defaults to Date added (Newest first) on load', async () => {
+      useTripStore.setState({
+        alternatives: [
+          { ...SEED_ALTS[0], id: 'a1', name: 'Older', createdAt: '2026-01-01T00:00:00.000Z' },
+          { ...SEED_ALTS[1], id: 'a2', name: 'Newer', createdAt: '2026-03-01T00:00:00.000Z' },
+        ],
+      });
+      renderWithProviders(<AlternativesShelf />);
+
+      const text = document.body.textContent ?? '';
+      expect(text.indexOf('Newer')).toBeLessThan(text.indexOf('Older'));
+
+      await expandControls();
+      expect(screen.getByText('Date added (Newest first)')).toBeInTheDocument();
+    });
+
+    it('sorts Name (Z–A) when selected', async () => {
+      useTripStore.setState({
+        alternatives: [
+          { ...SEED_ALTS[1], name: 'Zebra Cafe' },
+          { ...SEED_ALTS[0], name: 'Apple Store' },
+        ],
+      });
+      renderWithProviders(<AlternativesShelf />);
+
+      await expandControls();
+      await selectSortOption(/name \(z–a\)/i);
+
+      const text = document.body.textContent ?? '';
+      expect(text.indexOf('Zebra Cafe')).toBeLessThan(text.indexOf('Apple Store'));
+    });
+
+    it('sorts Date added (Newest first) by createdAt descending', async () => {
+      useTripStore.setState({
+        alternatives: [
+          { ...SEED_ALTS[0], id: 'a1', name: 'Oldest', createdAt: '2026-01-01T00:00:00.000Z' },
+          { ...SEED_ALTS[1], id: 'a2', name: 'Newest', createdAt: '2026-03-01T00:00:00.000Z' },
+          { ...SEED_ALTS[0], id: 'a3', name: 'Middle', createdAt: '2026-02-01T00:00:00.000Z' },
+        ],
+      });
+      renderWithProviders(<AlternativesShelf />);
+
+      await expandControls();
+      await selectSortOption(/date added \(newest first\)/i);
+
+      const text = document.body.textContent ?? '';
+      expect(text.indexOf('Newest')).toBeLessThan(text.indexOf('Middle'));
+      expect(text.indexOf('Middle')).toBeLessThan(text.indexOf('Oldest'));
+    });
+
+    it('sorts Date added (Oldest first) by createdAt ascending', async () => {
+      useTripStore.setState({
+        alternatives: [
+          { ...SEED_ALTS[0], id: 'a1', name: 'Oldest', createdAt: '2026-01-01T00:00:00.000Z' },
+          { ...SEED_ALTS[1], id: 'a2', name: 'Newest', createdAt: '2026-03-01T00:00:00.000Z' },
+          { ...SEED_ALTS[0], id: 'a3', name: 'Middle', createdAt: '2026-02-01T00:00:00.000Z' },
+        ],
+      });
+      renderWithProviders(<AlternativesShelf />);
+
+      await expandControls();
+      await selectSortOption(/date added \(oldest first\)/i);
+
+      const text = document.body.textContent ?? '';
+      expect(text.indexOf('Oldest')).toBeLessThan(text.indexOf('Middle'));
+      expect(text.indexOf('Middle')).toBeLessThan(text.indexOf('Newest'));
+    });
+
+    it('sorts a legacy item with no createdAt last under Date added, both directions', async () => {
+      useTripStore.setState({
+        alternatives: [
+          { ...SEED_ALTS[0], id: 'a1', name: 'Old Place', createdAt: '2026-01-01T00:00:00.000Z' },
+          { ...SEED_ALTS[1], id: 'a2', name: 'New Place', createdAt: '2026-03-01T00:00:00.000Z' },
+          { ...SEED_ALTS[0], id: 'a3', name: 'Legacy Place', createdAt: undefined },
+        ],
+      });
+      renderWithProviders(<AlternativesShelf />);
+
+      await expandControls();
+
+      await selectSortOption(/date added \(oldest first\)/i);
+      let text = document.body.textContent ?? '';
+      expect(text.indexOf('Old Place')).toBeLessThan(text.indexOf('Legacy Place'));
+      expect(text.indexOf('New Place')).toBeLessThan(text.indexOf('Legacy Place'));
+
+      await selectSortOption(/date added \(newest first\)/i);
+      text = document.body.textContent ?? '';
+      expect(text.indexOf('New Place')).toBeLessThan(text.indexOf('Legacy Place'));
+      expect(text.indexOf('Old Place')).toBeLessThan(text.indexOf('Legacy Place'));
+    });
+
+    it('renders two legacy items with no createdAt without throwing', async () => {
+      useTripStore.setState({
+        alternatives: [
+          { ...SEED_ALTS[0], id: 'a1', name: 'Legacy One', createdAt: undefined },
+          { ...SEED_ALTS[1], id: 'a2', name: 'Legacy Two', createdAt: undefined },
+        ],
+      });
+      renderWithProviders(<AlternativesShelf />);
+
+      await expandControls();
+      await selectSortOption(/date added \(newest first\)/i);
+
+      expect(screen.getByText('Legacy One')).toBeInTheDocument();
+      expect(screen.getByText('Legacy Two')).toBeInTheDocument();
     });
   });
 });

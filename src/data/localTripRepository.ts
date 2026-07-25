@@ -373,8 +373,15 @@ export class LocalTripRepository implements TripRepository {
     this.altSubs.get(tripId)?.forEach((cb) => cb(loadAlt()));
   }
 
-  async addAlternative(tripId: string, alt: Omit<Alternative, 'id'>): Promise<Alternative> {
-    const saved: Alternative = { ...alt, id: `local-alt-${Date.now()}` };
+  async addAlternative(
+    tripId: string,
+    alt: Omit<Alternative, 'id' | 'createdAt'>
+  ): Promise<Alternative> {
+    const saved: Alternative = {
+      ...alt,
+      id: `local-alt-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
     saveAlt([...loadAlt(), saved]);
     this.notifyAlt(tripId);
     this.pushActivity(tripId, { type: 'alternative_added', entityName: alt.name });
@@ -383,11 +390,13 @@ export class LocalTripRepository implements TripRepository {
 
   async addAlternatives(
     tripId: string,
-    alternatives: Omit<Alternative, 'id'>[]
+    alternatives: Omit<Alternative, 'id' | 'createdAt'>[]
   ): Promise<Alternative[]> {
+    const now = new Date().toISOString();
     const saved: Alternative[] = alternatives.map((alt, i) => ({
       ...alt,
       id: `local-alt-${Date.now()}-${i}`,
+      createdAt: now,
     }));
     saveAlt([...loadAlt(), ...saved]);
     this.notifyAlt(tripId);
@@ -400,7 +409,7 @@ export class LocalTripRepository implements TripRepository {
   async updateAlternative(
     tripId: string,
     id: string,
-    changes: Partial<Omit<Alternative, 'id'>>
+    changes: Partial<Omit<Alternative, 'id' | 'createdAt'>>
   ): Promise<void> {
     saveAlt(loadAlt().map((a) => (a.id === id ? { ...a, ...changes } : a)));
     this.notifyAlt(tripId);
