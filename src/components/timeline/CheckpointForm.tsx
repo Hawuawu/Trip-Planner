@@ -78,6 +78,11 @@ export function CheckpointForm({
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [websiteUrl, setWebsiteUrl] = useState(initial?.websiteUrl ?? '');
   const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
+  // Tracks whatever's currently typed in the free-solo tags input but not
+  // yet committed to a chip (via Enter/selection) — without this, clicking
+  // Save right after typing a tag (a very natural flow) silently drops it,
+  // since `tags` only gets updated on commit, not on every keystroke.
+  const [tagInput, setTagInput] = useState('');
   const {
     status: nameRomanizeStatus,
     romanize: romanizeName,
@@ -96,7 +101,9 @@ export function CheckpointForm({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !startTime) return;
-    const cleanedTags = Array.from(new Set(tags.map((t) => t.trim()).filter(Boolean)));
+    const pendingTag = tagInput.trim();
+    const allTags = pendingTag ? [...tags, pendingTag] : tags;
+    const cleanedTags = Array.from(new Set(allTags.map((t) => t.trim()).filter(Boolean)));
     onSave({
       type,
       name: name.trim(),
@@ -278,7 +285,9 @@ export function CheckpointForm({
           size="small"
           options={existingTags ?? []}
           value={tags}
+          inputValue={tagInput}
           onChange={(_e, newValue) => setTags(newValue)}
+          onInputChange={(_e, newInputValue) => setTagInput(newInputValue)}
           renderTags={(value, getTagProps) =>
             value.map((option, index) => {
               const color = getTagColor(option);
