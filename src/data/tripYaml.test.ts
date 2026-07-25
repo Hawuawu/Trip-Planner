@@ -296,6 +296,48 @@ describe('per-field validation — alternatives', () => {
   });
 });
 
+describe('tags', () => {
+  it('round-trips tags through serializeTrip / parseTripYaml', () => {
+    const withTags: Checkpoint[] = [{ ...CHECKPOINTS[0], tags: ['long-haul', 'jet-lag-risk'] }];
+    const altsWithTags: Alternative[] = [{ ...ALTERNATIVES[0], tags: ['food'] }];
+    const yamlText = serializeTrip(TRIP, withTags, altsWithTags);
+    const parsed = parseTripYaml(yamlText);
+
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.checkpoints[0].tags).toEqual(['long-haul', 'jet-lag-risk']);
+    expect(parsed.alternatives[0].tags).toEqual(['food']);
+  });
+
+  it('parses cleanly when tags is absent (backward compatible)', () => {
+    const parsed = parseCheckpointsYaml(
+      'checkpoints:\n  - type: poi\n    name: No tags\n    startTime: "2026-01-01T00:00:00.000Z"\n'
+    );
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.checkpoints[0]).not.toHaveProperty('tags');
+  });
+
+  it('rejects "tags" that is not a list', () => {
+    const parsed = parseCheckpointsYaml(
+      'checkpoints:\n  - type: poi\n    name: Bad tags\n    startTime: "2026-01-01T00:00:00.000Z"\n    tags: "food"\n'
+    );
+    expect(parsed.errors.some((e) => e.message.includes('"tags"'))).toBe(true);
+  });
+
+  it('rejects a "tags" list containing a non-string element', () => {
+    const parsed = parseCheckpointsYaml(
+      'checkpoints:\n  - type: poi\n    name: Bad tags\n    startTime: "2026-01-01T00:00:00.000Z"\n    tags: [1, 2]\n'
+    );
+    expect(parsed.errors.some((e) => e.message.includes('"tags"'))).toBe(true);
+  });
+
+  it('validates tags for alternatives too', () => {
+    const parsed = parseCheckpointsYaml(
+      'alternatives:\n  - type: poi\n    name: Bad tags\n    tags: "food"\n'
+    );
+    expect(parsed.errors.some((e) => e.message.includes('"tags"'))).toBe(true);
+  });
+});
+
 describe('parseTripYaml — full-trip-only fields', () => {
   it('requires a non-empty top-level "name"', () => {
     const parsed = parseTripYaml('dateRange:\n  start: "2026-01-01"\n  end: "2026-01-05"\n');

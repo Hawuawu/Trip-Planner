@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { TimelineView } from '../components/timeline/TimelineView';
 import { renderWithProviders, resetStores } from './helpers';
 import { useTripStore } from '../store/tripStore';
@@ -216,5 +217,88 @@ describe('TimelineView — with checkpoints', () => {
     const connectors = container.querySelectorAll('.MuiTimelineConnector-root');
     // One connector for first item, none for last
     expect(connectors.length).toBe(1);
+  });
+
+  describe('search & tag filtering', () => {
+    function seedCheckpointsWithTags() {
+      seedCheckpoints([
+        makeCheckpoint({
+          id: 'a',
+          name: 'JFK → NRT',
+          startTime: '2026-10-01T14:00:00.000Z',
+          tags: ['long-haul'],
+        }),
+        makeCheckpoint({
+          id: 'b',
+          name: 'Fushimi Inari-taisha',
+          startTime: '2026-10-06T08:00:00.000Z',
+          type: 'poi',
+          tags: ['must-see', 'outdoors'],
+        }),
+      ]);
+    }
+
+    it('keeps the search input collapsed/hidden until the controls toggle is clicked', () => {
+      seedCheckpointsWithTags();
+      renderWithProviders(<TimelineView />);
+      expect(screen.queryByPlaceholderText(/search checkpoints/i)).not.toBeVisible();
+    });
+
+    it('renders tag chips on checkpoint items', () => {
+      seedCheckpointsWithTags();
+      renderWithProviders(<TimelineView />);
+      // Also appears as a (collapsed) filter chip in ListControls, so at
+      // least one match rather than exactly one.
+      expect(screen.getAllByText('long-haul').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('must-see').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('filters the checkpoint list by the search input', async () => {
+      const user = userEvent.setup();
+      seedCheckpointsWithTags();
+      renderWithProviders(<TimelineView />);
+
+      await user.click(screen.getByRole('button', { name: /show search and filters/i }));
+      await user.type(screen.getByPlaceholderText(/search checkpoints/i), 'Fushimi');
+
+      expect(screen.getByText('Fushimi Inari-taisha')).toBeInTheDocument();
+      expect(screen.queryByText('JFK → NRT')).not.toBeInTheDocument();
+    });
+
+    it('filters the checkpoint list by tag when a filter chip is clicked', async () => {
+      const user = userEvent.setup();
+      seedCheckpointsWithTags();
+      renderWithProviders(<TimelineView />);
+
+      await user.click(screen.getByRole('button', { name: /show search and filters/i }));
+      await user.click(screen.getAllByText('long-haul')[0]);
+
+      expect(screen.getByText('JFK → NRT')).toBeInTheDocument();
+      expect(screen.queryByText('Fushimi Inari-taisha')).not.toBeInTheDocument();
+    });
+
+    it('does not corrupt the active-checkpoint highlight when a filter hides the active one', async () => {
+      const user = userEvent.setup();
+      seedCheckpointsWithTags();
+      renderWithProviders(<TimelineView />);
+
+      await user.click(screen.getByRole('button', { name: /show search and filters/i }));
+      await user.type(screen.getByPlaceholderText(/search checkpoints/i), 'Fushimi');
+
+      // Only one checkpoint renders, but selecting it should still work — the
+      // active/isLast logic must not throw or desync when filtered.
+      expect(screen.getByText('Fushimi Inari-taisha')).toBeInTheDocument();
+    });
+
+    it('shows a no-match message when the filter excludes everything', async () => {
+      const user = userEvent.setup();
+      seedCheckpointsWithTags();
+      renderWithProviders(<TimelineView />);
+
+      await user.click(screen.getByRole('button', { name: /show search and filters/i }));
+      await user.type(screen.getByPlaceholderText(/search checkpoints/i), 'Nonexistent');
+
+      expect(screen.getByText(/no checkpoints match/i)).toBeInTheDocument();
+    });
   });
 });

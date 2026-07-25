@@ -9,12 +9,14 @@ import {
   DialogContentText,
   DialogActions,
   Button,
+  Chip,
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import type { Alternative } from '../../types';
 import { CheckpointIcon } from '../timeline/CheckpointIcon';
+import { getTagColor } from '../../utils/tagColors';
 
 interface Props {
   alternative: Alternative;
@@ -76,6 +78,21 @@ export function AlternativeItem({ alternative, onSelect, onPromote, onDelete }: 
             >
               {alternative.location?.label ?? alternative.notes}
             </Typography>
+          )}
+          {alternative.tags && alternative.tags.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+              {alternative.tags.map((tag) => {
+                const color = getTagColor(tag);
+                return (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    size="small"
+                    sx={{ height: 20, fontSize: '0.7rem', bgcolor: color.bg, color: color.fg }}
+                  />
+                );
+              })}
+            </Box>
           )}
         </Box>
       </Box>

@@ -17,6 +17,14 @@ const checkpointInputSchema = z.object({
   endTime: z.string().describe('ISO 8601 timestamp').optional(),
   location: locationSchema.optional(),
   notes: z.string().optional(),
+  tags: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Free-form labels for filtering in the app. Call list_tags first and reuse an existing ' +
+        'tag where one fits — do not invent a near-duplicate (e.g. "Food" or "dining") of a tag ' +
+        'that already exists.'
+    ),
   linkedBookingId: z.string().optional(),
 });
 
@@ -25,6 +33,14 @@ const alternativeInputSchema = z.object({
   name: z.string(),
   location: locationSchema.optional(),
   notes: z.string().optional(),
+  tags: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Free-form labels for filtering in the app. Call list_tags first and reuse an existing ' +
+        'tag where one fits — do not invent a near-duplicate (e.g. "Food" or "dining") of a tag ' +
+        'that already exists.'
+    ),
 });
 
 const bookingInputSchema = z.object({
@@ -46,11 +62,8 @@ export function registerTools(server: McpServer, repo: FirebaseClientTripReposit
     json(await repo.listTrips())
   );
 
-  server.tool(
-    'get_trip',
-    'Get a single trip by id.',
-    { tripId: z.string() },
-    async ({ tripId }) => json(await repo.getTrip(tripId))
+  server.tool('get_trip', 'Get a single trip by id.', { tripId: z.string() }, async ({ tripId }) =>
+    json(await repo.getTrip(tripId))
   );
 
   server.tool(
@@ -62,12 +75,28 @@ export function registerTools(server: McpServer, repo: FirebaseClientTripReposit
 
   server.tool(
     'update_trip',
-    "Rename a trip or change its date range. Owner-only, enforced by Firestore rules.",
-    { tripId: z.string(), changes: z.object({ name: z.string().optional(), dateRange: z.object({ start: z.string(), end: z.string() }).optional() }) },
+    'Rename a trip or change its date range. Owner-only, enforced by Firestore rules.',
+    {
+      tripId: z.string(),
+      changes: z.object({
+        name: z.string().optional(),
+        dateRange: z.object({ start: z.string(), end: z.string() }).optional(),
+      }),
+    },
     async ({ tripId, changes }) => {
       await repo.updateTrip(tripId, changes);
       return json({ ok: true });
     }
+  );
+
+  server.tool(
+    'list_tags',
+    "List every distinct tag currently used across a trip's checkpoints and alternatives, " +
+      'sorted alphabetically. Call this before setting tags on a checkpoint or alternative — ' +
+      'prefer reusing an existing tag from this list over inventing a new one, so the tag ' +
+      'vocabulary stays consistent for filtering in the app.',
+    { tripId: z.string() },
+    async ({ tripId }) => json(await repo.listTags(tripId))
   );
 
   server.tool(
@@ -86,14 +115,14 @@ export function registerTools(server: McpServer, repo: FirebaseClientTripReposit
 
   server.tool(
     'add_checkpoint',
-    'Add one checkpoint to a trip\'s timeline.',
+    "Add one checkpoint to a trip's timeline.",
     { tripId: z.string(), checkpoint: checkpointInputSchema },
     async ({ tripId, checkpoint }) => json(await repo.addCheckpoint(tripId, checkpoint))
   );
 
   server.tool(
     'add_checkpoints',
-    'Add several checkpoints to a trip\'s timeline in one call — e.g. importing a drafted itinerary.',
+    "Add several checkpoints to a trip's timeline in one call — e.g. importing a drafted itinerary.",
     { tripId: z.string(), checkpoints: z.array(checkpointInputSchema) },
     async ({ tripId, checkpoints }) => json(await repo.addCheckpoints(tripId, checkpoints))
   );
@@ -121,14 +150,14 @@ export function registerTools(server: McpServer, repo: FirebaseClientTripReposit
 
   server.tool(
     'add_alternative',
-    'Add one point of interest to a trip\'s alternatives shelf.',
+    "Add one point of interest to a trip's alternatives shelf.",
     { tripId: z.string(), alternative: alternativeInputSchema },
     async ({ tripId, alternative }) => json(await repo.addAlternative(tripId, alternative))
   );
 
   server.tool(
     'add_alternatives',
-    'Add several points of interest to a trip\'s alternatives shelf in one call.',
+    "Add several points of interest to a trip's alternatives shelf in one call.",
     { tripId: z.string(), alternatives: z.array(alternativeInputSchema) },
     async ({ tripId, alternatives }) => json(await repo.addAlternatives(tripId, alternatives))
   );
@@ -148,7 +177,11 @@ export function registerTools(server: McpServer, repo: FirebaseClientTripReposit
     'Promote an alternative onto the timeline as a checkpoint at the given start time. The ' +
       'alternative is removed from the shelf as part of this (same as the web app) — the ' +
       "server's general no-delete-tools scope doesn't apply to this atomic promotion step.",
-    { tripId: z.string(), alternativeId: z.string(), startTime: z.string().describe('ISO 8601 timestamp') },
+    {
+      tripId: z.string(),
+      alternativeId: z.string(),
+      startTime: z.string().describe('ISO 8601 timestamp'),
+    },
     async ({ tripId, alternativeId, startTime }) => {
       await repo.promoteAlternative(tripId, alternativeId, startTime);
       return json({ ok: true });

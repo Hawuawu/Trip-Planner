@@ -110,6 +110,8 @@ and was left out of this pass rather than assumed in.
 ```
 list_trips(), get_trip(tripId), create_trip(name, dateRange), update_trip(tripId, changes)
 
+list_tags(tripId)
+
 list_checkpoints(tripId), get_checkpoint(tripId, checkpointId)
 add_checkpoint(tripId, checkpoint), add_checkpoints(tripId, checkpoints[])
 update_checkpoint(tripId, checkpointId, changes)
@@ -122,6 +124,16 @@ promote_alternative(tripId, alternativeId, startTime)
 list_bookings(tripId)
 add_booking(tripId, booking), update_booking(tripId, bookingId, changes)
 ```
+
+`checkpoint`/`alternative` inputs also accept an optional `tags: string[]`
+(trip-planner's tags + tag-filter feature). `list_tags` returns the deduped,
+sorted union of every tag already in use across a trip's checkpoints and
+alternatives — its tool description and the `tags` field description on
+`add_checkpoint`/`update_checkpoint`/`add_alternative`/`update_alternative`
+both instruct the calling model to check `list_tags` first and reuse an
+existing tag rather than inventing a near-duplicate (e.g. "Food" next to an
+existing "food"), so the tag vocabulary stays consistent for the app's
+tag-filter UI.
 
 `promote_alternative` deletes the promoted alternative after copying it to
 the timeline, matching the web app's own `promoteAlternative` — confirmed

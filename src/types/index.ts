@@ -15,6 +15,7 @@ export interface Checkpoint {
   location?: Location;
   notes?: string;
   websiteUrl?: string;
+  tags?: string[];
   linkedBookingId?: string;
   updatedAt: string;
 }
@@ -26,6 +27,7 @@ export interface Alternative {
   location?: Location;
   notes?: string;
   websiteUrl?: string;
+  tags?: string[];
 }
 
 export interface Booking {

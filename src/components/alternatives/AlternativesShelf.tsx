@@ -9,16 +9,16 @@ import {
   TextField,
   DialogActions,
   Drawer,
-  InputAdornment,
   Snackbar,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import SearchIcon from '@mui/icons-material/Search';
 import { useTripStore } from '../../store/tripStore';
 import { AlternativeItem } from './AlternativeItem';
 import { AlternativeForm } from './AlternativeForm';
+import { ListControls } from '../shared/ListControls';
+import { collectAllTags, matchesAnyTag } from '../../utils/tags';
 import type { Alternative } from '../../types';
 
 interface Props {
@@ -31,6 +31,7 @@ export function AlternativesShelf({ openAddSignal, prefill }: Props) {
   const isPhone = useMediaQuery(theme.breakpoints.down('sm'));
 
   const {
+    checkpoints,
     alternatives,
     addAlternative,
     updateAlternative,
@@ -42,6 +43,7 @@ export function AlternativesShelf({ openAddSignal, prefill }: Props) {
   } = useTripStore();
 
   const [search, setSearch] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [promoteId, setPromoteId] = useState<string | null>(null);
   const [promoteTime, setPromoteTime] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -64,13 +66,25 @@ export function AlternativesShelf({ openAddSignal, prefill }: Props) {
     setAddOpen(true);
   }, [openAddSignal]);
 
+  const allTags = useMemo(
+    () => collectAllTags(checkpoints, alternatives),
+    [checkpoints, alternatives]
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return alternatives;
-    return alternatives.filter((a) =>
-      [a.name, a.location?.label, a.notes].some((f) => f?.toLowerCase().includes(q))
+    return alternatives.filter((a) => {
+      const matchesSearch =
+        !q || [a.name, a.location?.label, a.notes].some((f) => f?.toLowerCase().includes(q));
+      return matchesSearch && matchesAnyTag(a.tags, selectedTags);
+    });
+  }, [alternatives, search, selectedTags]);
+
+  function toggleTag(tag: string) {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
-  }, [alternatives, search]);
+  }
 
   function handlePromote() {
     if (!promoteId || !promoteTime) return;
@@ -83,6 +97,7 @@ export function AlternativesShelf({ openAddSignal, prefill }: Props) {
     <AlternativeForm
       title="Add alternative"
       initial={addPrefill}
+      existingTags={allTags}
       onSave={(data) => {
         addAlternative(data);
         setAddOpen(false);
@@ -97,6 +112,7 @@ export function AlternativesShelf({ openAddSignal, prefill }: Props) {
     <AlternativeForm
       title="Edit alternative"
       initial={editing}
+      existingTags={allTags}
       onSave={(data) => {
         updateAlternative(editing.id, data);
         setEditingId(null);
@@ -134,22 +150,14 @@ export function AlternativesShelf({ openAddSignal, prefill }: Props) {
         </Box>
       ) : (
         <>
-          <Box sx={{ p: 2, pb: 1 }}>
-            <TextField
-              size="small"
-              fullWidth
-              placeholder="Search alternatives…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Box>
+          <ListControls
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search alternatives…"
+            allTags={allTags}
+            selectedTags={selectedTags}
+            onToggleTag={toggleTag}
+          />
 
           <Box sx={{ px: 2, pb: 2, flex: 1 }}>
             {filtered.length === 0 ? (

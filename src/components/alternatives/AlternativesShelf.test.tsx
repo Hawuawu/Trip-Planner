@@ -232,6 +232,7 @@ describe('AlternativesShelf', () => {
     useTripStore.setState({ alternatives: SEED_ALTS });
     renderWithProviders(<AlternativesShelf />);
 
+    await userEvent.click(screen.getByRole('button', { name: /show search and filters/i }));
     await userEvent.type(screen.getByPlaceholderText(/search alternatives/i), 'Park Hyatt');
 
     expect(screen.getByText('Park Hyatt Tokyo')).toBeInTheDocument();
@@ -242,11 +243,49 @@ describe('AlternativesShelf', () => {
     useTripStore.setState({ alternatives: SEED_ALTS });
     renderWithProviders(<AlternativesShelf />);
 
+    await userEvent.click(screen.getByRole('button', { name: /show search and filters/i }));
     await userEvent.type(screen.getByPlaceholderText(/search alternatives/i), 'Nonexistent Place');
 
     expect(screen.queryByText('Park Hyatt Tokyo')).not.toBeInTheDocument();
     expect(screen.queryByText('teamLab Borderless')).not.toBeInTheDocument();
     expect(screen.getByText(/no alternatives match/i)).toBeInTheDocument();
+  });
+
+  // ── Controls section (collapsed-by-default, tag filter) ─────────────────
+
+  it('keeps the search input collapsed/hidden until the controls toggle is clicked', () => {
+    useTripStore.setState({ alternatives: SEED_ALTS });
+    renderWithProviders(<AlternativesShelf />);
+    expect(screen.queryByPlaceholderText(/search alternatives/i)).not.toBeVisible();
+  });
+
+  it('renders tag chips on alternative items when tags are present', () => {
+    useTripStore.setState({
+      alternatives: [{ ...SEED_ALTS[0], tags: ['rainy-day', 'must-see'] }],
+    });
+    renderWithProviders(<AlternativesShelf />);
+    // Also appears as a (collapsed) filter chip in ListControls, so at
+    // least one match rather than exactly one.
+    expect(screen.getAllByText('rainy-day').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('must-see').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('filters the alternatives list by tag when a filter chip is clicked', async () => {
+    useTripStore.setState({
+      alternatives: [
+        { ...SEED_ALTS[0], tags: ['rainy-day'] },
+        { ...SEED_ALTS[1], tags: ['food'] },
+      ],
+    });
+    renderWithProviders(<AlternativesShelf />);
+
+    await userEvent.click(screen.getByRole('button', { name: /show search and filters/i }));
+    // Tag filter chips appear alongside the tag chips already on each item —
+    // scope to the filter row via the clickable chip role.
+    await userEvent.click(screen.getAllByText('food')[0]);
+
+    expect(screen.getByText('Park Hyatt Tokyo')).toBeInTheDocument();
+    expect(screen.queryByText('teamLab Borderless')).not.toBeInTheDocument();
   });
 
   // ── Delete with confirmation + undo ──────────────────────────────────────
