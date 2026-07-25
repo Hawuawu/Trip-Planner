@@ -25,9 +25,14 @@ interface Props {
   openAddSignal?: number;
   prefill?: Partial<Omit<Alternative, 'id'>> | null;
   onSaved?: (message: string) => void;
+  onError?: (message: string) => void;
 }
 
-export function AlternativesShelf({ openAddSignal, prefill, onSaved }: Props) {
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback;
+}
+
+export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: Props) {
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -99,11 +104,15 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved }: Props) {
       title="Add alternative"
       initial={addPrefill}
       existingTags={allTags}
-      onSave={(data) => {
-        addAlternative(data);
-        setAddOpen(false);
-        setAddPrefill(undefined);
-        onSaved?.(`Alternative "${data.name}" added.`);
+      onSave={async (data) => {
+        try {
+          await addAlternative(data);
+          setAddOpen(false);
+          setAddPrefill(undefined);
+          onSaved?.(`Alternative "${data.name}" added.`);
+        } catch (err) {
+          onError?.(errorMessage(err, `Failed to add "${data.name}".`));
+        }
       }}
       onCancel={() => {
         setAddOpen(false);
@@ -115,10 +124,14 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved }: Props) {
       title="Edit alternative"
       initial={editing}
       existingTags={allTags}
-      onSave={(data) => {
-        updateAlternative(editing.id, data);
-        setEditingId(null);
-        onSaved?.(`Alternative "${data.name}" updated.`);
+      onSave={async (data) => {
+        try {
+          await updateAlternative(editing.id, data);
+          setEditingId(null);
+          onSaved?.(`Alternative "${data.name}" updated.`);
+        } catch (err) {
+          onError?.(errorMessage(err, `Failed to update "${data.name}".`));
+        }
       }}
       onCancel={() => setEditingId(null)}
     />
@@ -178,7 +191,11 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved }: Props) {
                   alternative={alt}
                   onSelect={() => setEditingId(alt.id)}
                   onPromote={() => setPromoteId(alt.id)}
-                  onDelete={() => deleteAlternative(alt.id)}
+                  onDelete={() =>
+                    deleteAlternative(alt.id).catch((err: unknown) =>
+                      onError?.(errorMessage(err, `Failed to delete "${alt.name}".`))
+                    )
+                  }
                 />
               ))
             )}

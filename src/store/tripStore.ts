@@ -105,8 +105,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     set({ trip: { ...trip, memberIds: trip.memberIds.filter((id) => id !== uid) } });
     try {
       await repo.removeMember(tripId, uid);
-    } catch {
+    } catch (err) {
       set({ trip: prev });
+      throw err;
     }
   },
 
@@ -161,8 +162,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     });
     try {
       await repo.updateCheckpoint(tripId, id, changes);
-    } catch {
+    } catch (err) {
       if (prev) set((s) => ({ checkpoints: s.checkpoints.map((c) => (c.id === id ? prev : c)) }));
+      throw err;
     }
   },
 
@@ -173,13 +175,15 @@ export const useTripStore = create<TripState>((set, get) => ({
     set({ checkpoints: checkpoints.filter((c) => c.id !== id), undoCheckpoint: target ?? null });
     try {
       await repo.deleteCheckpoint(tripId, id);
-    } catch {
+    } catch (err) {
       if (target)
         set((s) => ({
           checkpoints: [...s.checkpoints, target].sort((a, b) =>
             a.startTime.localeCompare(b.startTime)
           ),
+          undoCheckpoint: s.undoCheckpoint === target ? null : s.undoCheckpoint,
         }));
+      throw err;
     }
   },
 
@@ -248,8 +252,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     set({ alternatives: alternatives.map((a) => (a.id === id ? { ...a, ...changes } : a)) });
     try {
       await repo.updateAlternative(tripId, id, changes);
-    } catch {
+    } catch (err) {
       if (prev) set((s) => ({ alternatives: s.alternatives.map((a) => (a.id === id ? prev : a)) }));
+      throw err;
     }
   },
 
@@ -263,8 +268,13 @@ export const useTripStore = create<TripState>((set, get) => ({
     });
     try {
       await repo.deleteAlternative(tripId, id);
-    } catch {
-      if (target) set((s) => ({ alternatives: [...s.alternatives, target] }));
+    } catch (err) {
+      if (target)
+        set((s) => ({
+          alternatives: [...s.alternatives, target],
+          undoAlternative: s.undoAlternative === target ? null : s.undoAlternative,
+        }));
+      throw err;
     }
   },
 
@@ -315,8 +325,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     });
     try {
       await repo.updateBooking(tripId, id, changes);
-    } catch {
+    } catch (err) {
       if (prev) set((s) => ({ bookings: s.bookings.map((b) => (b.id === id ? prev : b)) }));
+      throw err;
     }
   },
 
@@ -351,8 +362,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     });
     try {
       await repo.updateRoute(tripId, id, changes);
-    } catch {
+    } catch (err) {
       if (prev) set((s) => ({ routes: s.routes.map((r) => (r.id === id ? prev : r)) }));
+      throw err;
     }
   },
 
@@ -363,8 +375,9 @@ export const useTripStore = create<TripState>((set, get) => ({
     set({ routes: routes.filter((r) => r.id !== id) });
     try {
       await repo.deleteRoute(tripId, id);
-    } catch {
+    } catch (err) {
       set({ routes: prev });
+      throw err;
     }
   },
 }));

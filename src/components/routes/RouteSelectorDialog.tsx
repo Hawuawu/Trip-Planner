@@ -93,9 +93,14 @@ export function RouteSelectorDialog({ open, onClose, onSaved }: Props) {
 
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
-    await deleteRoute(deleteTarget.id);
-    setDeleteTarget(null);
-    setEditingRoute(null);
+    try {
+      await deleteRoute(deleteTarget.id);
+      setDeleteTarget(null);
+      setEditingRoute(null);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to delete route.');
+      setDeleteTarget(null);
+    }
   }
 
   const pickerCheckpoints = checkpoints.filter((cp) =>

@@ -129,12 +129,12 @@ describe('tripStore — membership', () => {
     expect(useTripStore.getState().trip?.memberIds).toEqual(['u1']);
   });
 
-  it('removeMember rolls back on failure', async () => {
+  it('removeMember rolls back on failure and rethrows', async () => {
     const removeMember = vi.fn().mockRejectedValue(new Error('denied'));
     const repo = makeMockRepo({ removeMember });
     useTripStore.getState().init('trip-1', repo);
     useTripStore.setState({ trip: { ...TRIP, memberIds: ['u1', 'u2'] } });
-    await useTripStore.getState().removeMember('u2');
+    await expect(useTripStore.getState().removeMember('u2')).rejects.toThrow('denied');
     expect(useTripStore.getState().trip?.memberIds).toEqual(['u1', 'u2']);
   });
 
@@ -289,13 +289,15 @@ describe('tripStore — updateCheckpoint (optimistic + rollback)', () => {
     expect(useTripStore.getState().checkpoints[0].name).toBe('Updated');
   });
 
-  it('rolls back to the previous value when the repo throws', async () => {
+  it('rolls back to the previous value and rethrows when the repo throws', async () => {
     const updateCheckpoint = vi.fn().mockRejectedValue(new Error('network'));
     const repo = makeMockRepo({ updateCheckpoint });
     const original = makeCheckpoint({ id: 'cp-1', name: 'Original' });
     useTripStore.setState({ repo, tripId: 'trip-1', checkpoints: [original] });
 
-    await useTripStore.getState().updateCheckpoint('cp-1', { name: 'Failed Update' });
+    await expect(
+      useTripStore.getState().updateCheckpoint('cp-1', { name: 'Failed Update' })
+    ).rejects.toThrow('network');
 
     expect(useTripStore.getState().checkpoints[0].name).toBe('Original');
   });
@@ -323,7 +325,7 @@ describe('tripStore — deleteCheckpoint (optimistic + undo)', () => {
     await promise;
   });
 
-  it('restores the checkpoint when the delete fails', async () => {
+  it('restores the checkpoint and rethrows when the delete fails', async () => {
     const deleteCheckpoint = vi.fn().mockRejectedValue(new Error('network'));
     const repo = makeMockRepo({ deleteCheckpoint });
     const cp = makeCheckpoint({
@@ -333,7 +335,7 @@ describe('tripStore — deleteCheckpoint (optimistic + undo)', () => {
     });
     useTripStore.setState({ repo, tripId: 'trip-1', checkpoints: [cp] });
 
-    await useTripStore.getState().deleteCheckpoint('cp-1');
+    await expect(useTripStore.getState().deleteCheckpoint('cp-1')).rejects.toThrow('network');
 
     expect(useTripStore.getState().checkpoints).toHaveLength(1);
     expect(useTripStore.getState().checkpoints[0].name).toBe('Restored');
@@ -544,13 +546,15 @@ describe('tripStore — bookings', () => {
     expect(useTripStore.getState().bookings[0].confirmationNumber).toBe('NEW-456');
   });
 
-  it('updateBooking rolls back when repo throws', async () => {
+  it('updateBooking rolls back and rethrows when repo throws', async () => {
     const updateBooking = vi.fn().mockRejectedValue(new Error('network'));
     const repo = makeMockRepo({ updateBooking });
     const original = { id: 'bk-1', provider: 'JAL', confirmationNumber: 'OLD-123' };
     useTripStore.setState({ repo, tripId: 'trip-1', bookings: [original] });
 
-    await useTripStore.getState().updateBooking('bk-1', { confirmationNumber: 'FAILED' });
+    await expect(
+      useTripStore.getState().updateBooking('bk-1', { confirmationNumber: 'FAILED' })
+    ).rejects.toThrow('network');
 
     expect(useTripStore.getState().bookings[0].confirmationNumber).toBe('OLD-123');
   });
@@ -633,7 +637,7 @@ describe('tripStore — routes', () => {
     expect(repo.updateRoute).toHaveBeenCalledWith('trip-1', 'route-1', { name: 'After' });
   });
 
-  it('updateRoute rolls back when repo throws', async () => {
+  it('updateRoute rolls back and rethrows when repo throws', async () => {
     const updateRoute = vi.fn().mockRejectedValue(new Error('network'));
     const repo = makeMockRepo({ updateRoute });
     const route: import('../types').Route = {
@@ -645,7 +649,9 @@ describe('tripStore — routes', () => {
     };
     useTripStore.setState({ repo, tripId: 'trip-1', routes: [route] });
 
-    await useTripStore.getState().updateRoute('route-1', { name: 'Failed' });
+    await expect(
+      useTripStore.getState().updateRoute('route-1', { name: 'Failed' })
+    ).rejects.toThrow('network');
 
     expect(useTripStore.getState().routes[0].name).toBe('Original');
   });
@@ -667,7 +673,7 @@ describe('tripStore — routes', () => {
     expect(repo.deleteRoute).toHaveBeenCalledWith('trip-1', 'route-1');
   });
 
-  it('deleteRoute restores the route when the repo throws', async () => {
+  it('deleteRoute restores the route and rethrows when the repo throws', async () => {
     const deleteRoute = vi.fn().mockRejectedValue(new Error('network'));
     const repo = makeMockRepo({ deleteRoute });
     const route: import('../types').Route = {
@@ -679,7 +685,7 @@ describe('tripStore — routes', () => {
     };
     useTripStore.setState({ repo, tripId: 'trip-1', routes: [route] });
 
-    await useTripStore.getState().deleteRoute('route-1');
+    await expect(useTripStore.getState().deleteRoute('route-1')).rejects.toThrow('network');
 
     expect(useTripStore.getState().routes).toHaveLength(1);
     expect(useTripStore.getState().routes[0].name).toBe('Restored');

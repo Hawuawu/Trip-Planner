@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Dialog,
@@ -30,6 +31,7 @@ export function BookingPanel({ checkpointId, linkedBookingId }: Props) {
   const [confirmationNumber, setConfirmationNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const linkedBooking = linkedBookingId
     ? bookings.find((b) => b.id === linkedBookingId)
@@ -39,6 +41,7 @@ export function BookingPanel({ checkpointId, linkedBookingId }: Props) {
     setProvider('');
     setConfirmationNumber('');
     setNotes('');
+    setError(null);
     setDialogOpen(true);
   }
 
@@ -51,6 +54,7 @@ export function BookingPanel({ checkpointId, linkedBookingId }: Props) {
     if (!tripId) return;
 
     setSubmitting(true);
+    setError(null);
     try {
       const newBooking = await addBooking({
         provider: provider.trim(),
@@ -59,13 +63,20 @@ export function BookingPanel({ checkpointId, linkedBookingId }: Props) {
       });
       await updateCheckpoint(checkpointId, { linkedBookingId: newBooking.id });
       setDialogOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save booking.');
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleRemoveLink() {
-    await updateCheckpoint(checkpointId, { linkedBookingId: undefined });
+    setError(null);
+    try {
+      await updateCheckpoint(checkpointId, { linkedBookingId: undefined });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove booking link.');
+    }
   }
 
   return (
@@ -96,18 +107,22 @@ export function BookingPanel({ checkpointId, linkedBookingId }: Props) {
               {linkedBooking.confirmationNumber}
             </Typography>
             {linkedBooking.notes && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mt: 0.5 }}
+              >
                 {linkedBooking.notes}
               </Typography>
             )}
-            <Button
-              size="small"
-              color="error"
-              onClick={handleRemoveLink}
-              sx={{ mt: 1, px: 0 }}
-            >
+            <Button size="small" color="error" onClick={handleRemoveLink} sx={{ mt: 1, px: 0 }}>
               Remove link
             </Button>
+            {error && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                {error}
+              </Alert>
+            )}
           </Box>
         ) : (
           <Button
@@ -125,6 +140,7 @@ export function BookingPanel({ checkpointId, linkedBookingId }: Props) {
         <DialogTitle>Add booking</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
+            {error && <Alert severity="error">{error}</Alert>}
             <TextField
               label="Provider"
               value={provider}
