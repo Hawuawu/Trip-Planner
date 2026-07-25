@@ -32,7 +32,7 @@ const TYPES: { value: CheckpointType; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
-type FormData = Omit<Alternative, 'id'>;
+type FormData = Omit<Alternative, 'id' | 'createdAt'>;
 
 interface Props {
   initial?: Partial<FormData>;

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import {
   Box,
@@ -19,6 +20,10 @@ interface Props {
   allTags: string[];
   selectedTags: string[];
   onToggleTag(tag: string): void;
+  // Generic slot for view-specific controls (e.g. AlternativesShelf's sort
+  // picker) that should expand/collapse together with search & filter,
+  // without this shared component knowing what they are.
+  extraControls?: ReactNode;
 }
 
 export function ListControls({
@@ -28,6 +33,7 @@ export function ListControls({
   allTags,
   selectedTags,
   onToggleTag,
+  extraControls,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
 
@@ -62,6 +68,8 @@ export function ListControls({
 
       <Collapse in={expanded}>
         <Box sx={{ pt: 1 }}>
+          {extraControls && <Box sx={{ mb: 1.5 }}>{extraControls}</Box>}
+
           <TextField
             size="small"
             fullWidth

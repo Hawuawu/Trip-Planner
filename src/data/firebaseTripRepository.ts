@@ -377,25 +377,42 @@ export class FirebaseTripRepository implements TripRepository {
 
   subscribeToAlternatives(tripId: string, cb: (alternatives: Alternative[]) => void): () => void {
     return onSnapshot(collection(this.db, 'trips', tripId, 'alternatives'), (snap) => {
-      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Alternative));
+      cb(
+        snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...(data as Omit<Alternative, 'id' | 'createdAt'>),
+            createdAt: data.createdAt ? toIso(data.createdAt) : undefined,
+          };
+        })
+      );
     });
   }
 
-  async addAlternative(tripId: string, alt: Omit<Alternative, 'id'>): Promise<Alternative> {
-    const ref = await addDoc(collection(this.db, 'trips', tripId, 'alternatives'), alt);
+  async addAlternative(
+    tripId: string,
+    alt: Omit<Alternative, 'id' | 'createdAt'>
+  ): Promise<Alternative> {
+    const now = new Date().toISOString();
+    const ref = await addDoc(collection(this.db, 'trips', tripId, 'alternatives'), {
+      ...alt,
+      createdAt: serverTimestamp(),
+    });
     void this.logActivity(tripId, { type: 'alternative_added', entityName: alt.name });
-    return { ...alt, id: ref.id };
+    return { ...alt, id: ref.id, createdAt: now };
   }
 
   async addAlternatives(
     tripId: string,
-    alternatives: Omit<Alternative, 'id'>[]
+    alternatives: Omit<Alternative, 'id' | 'createdAt'>[]
   ): Promise<Alternative[]> {
+    const now = new Date().toISOString();
     const batch = writeBatch(this.db);
     const collectionRef = collection(this.db, 'trips', tripId, 'alternatives');
     const refs = alternatives.map(() => doc(collectionRef));
     alternatives.forEach((alt, i) => {
-      batch.set(refs[i], alt);
+      batch.set(refs[i], { ...alt, createdAt: serverTimestamp() });
     });
     const actor = getAuth().currentUser;
     if (actor && alternatives.length > 0) {
@@ -408,13 +425,13 @@ export class FirebaseTripRepository implements TripRepository {
       });
     }
     await batch.commit();
-    return alternatives.map((alt, i) => ({ ...alt, id: refs[i].id }));
+    return alternatives.map((alt, i) => ({ ...alt, id: refs[i].id, createdAt: now }));
   }
 
   async updateAlternative(
     tripId: string,
     id: string,
-    changes: Partial<Omit<Alternative, 'id'>>
+    changes: Partial<Omit<Alternative, 'id' | 'createdAt'>>
   ): Promise<void> {
     await updateDoc(doc(this.db, 'trips', tripId, 'alternatives', id), { ...changes });
     void this.logActivity(tripId, {

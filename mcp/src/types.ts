@@ -31,6 +31,7 @@ export interface Alternative {
   location?: Location;
   notes?: string;
   tags?: string[];
+  createdAt?: string;
 }
 
 export interface Booking {

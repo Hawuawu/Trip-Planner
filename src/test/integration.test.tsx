@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { screen, within, fireEvent, waitFor, act } from '@testing-library/react';
 import { useTripStore } from '../store/tripStore';
 import { useAuthStore } from '../store/authStore';
 import { LocalTripRepository } from '../data/localTripRepository';
@@ -301,9 +301,13 @@ describe('Flow 4: Promote alternative to timeline', () => {
       expect(screen.getByText('teamLab Borderless')).toBeInTheDocument();
     });
 
-    // Click the "Add to timeline" promote button for the first alternative
-    const promoteBtns = screen.getAllByTitle('Add to timeline');
-    fireEvent.click(promoteBtns[0]);
+    // Click the "Add to timeline" promote button for "teamLab Borderless"
+    // specifically — the default Name A→Z sort (#76) means it isn't
+    // necessarily the first item rendered, so scope the query to its item
+    // container rather than indexing into a flat getAllByTitle list.
+    const teamLabItem = screen.getByText('teamLab Borderless').closest('div')!.parentElement!
+      .parentElement!;
+    fireEvent.click(within(teamLabItem).getByTitle('Add to timeline'));
 
     // The promote dialog should appear
     await waitFor(() => {
