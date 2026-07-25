@@ -1,4 +1,19 @@
-import { getFirestore, doc, getDoc, getDocs, collection, query, where, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, Timestamp, type Firestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  writeBatch,
+  serverTimestamp,
+  Timestamp,
+  type Firestore,
+} from 'firebase/firestore';
 import type { Auth } from 'firebase/auth';
 import type { Trip, Checkpoint, Alternative, Booking, MemberProfile } from '../types.js';
 
@@ -11,9 +26,9 @@ function toIso(val: unknown): string {
 function toMemberProfiles(raw: unknown): Record<string, MemberProfile> | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   return Object.fromEntries(
-    Object.entries(raw as Record<string, { email?: string | null; displayName?: string | null }>).map(
-      ([uid, p]) => [uid, { email: p.email ?? null, displayName: p.displayName ?? null }]
-    )
+    Object.entries(
+      raw as Record<string, { email?: string | null; displayName?: string | null }>
+    ).map(([uid, p]) => [uid, { email: p.email ?? null, displayName: p.displayName ?? null }])
   );
 }
 
@@ -37,6 +52,7 @@ function toCheckpoint(id: string, d: Record<string, unknown>): Checkpoint {
     endTime: d.endTime ? toIso(d.endTime) : undefined,
     location: (d.location as Checkpoint['location']) ?? undefined,
     notes: (d.notes as string) ?? undefined,
+    tags: (d.tags as string[]) ?? undefined,
     linkedBookingId: (d.linkedBookingId as string) ?? undefined,
     updatedAt: toIso(d.updatedAt),
   };
@@ -71,7 +87,9 @@ export class FirebaseClientTripRepository {
 
   async listTrips(): Promise<Trip[]> {
     const uid = this.requireUid();
-    const snap = await getDocs(query(collection(this.db, 'trips'), where('memberIds', 'array-contains', uid)));
+    const snap = await getDocs(
+      query(collection(this.db, 'trips'), where('memberIds', 'array-contains', uid))
+    );
     return snap.docs.map((d) => toTrip(d.id, d.data()));
   }
 
@@ -88,11 +106,20 @@ export class FirebaseClientTripRepository {
     const memberProfiles: Record<string, MemberProfile> = {
       [user.uid]: { email: user.email, displayName: user.displayName },
     };
-    const ref = await addDoc(collection(this.db, 'trips'), { name, dateRange, memberIds, ownerId: user.uid, memberProfiles });
+    const ref = await addDoc(collection(this.db, 'trips'), {
+      name,
+      dateRange,
+      memberIds,
+      ownerId: user.uid,
+      memberProfiles,
+    });
     return { id: ref.id, name, dateRange, memberIds, ownerId: user.uid, memberProfiles };
   }
 
-  async updateTrip(tripId: string, changes: Partial<Pick<Trip, 'name' | 'dateRange'>>): Promise<void> {
+  async updateTrip(
+    tripId: string,
+    changes: Partial<Pick<Trip, 'name' | 'dateRange'>>
+  ): Promise<void> {
     await updateDoc(doc(this.db, 'trips', tripId), { ...changes });
   }
 
@@ -109,13 +136,22 @@ export class FirebaseClientTripRepository {
     return toCheckpoint(snap.id, snap.data());
   }
 
-  async addCheckpoint(tripId: string, cp: Omit<Checkpoint, 'id' | 'updatedAt'>): Promise<Checkpoint> {
+  async addCheckpoint(
+    tripId: string,
+    cp: Omit<Checkpoint, 'id' | 'updatedAt'>
+  ): Promise<Checkpoint> {
     const now = new Date().toISOString();
-    const ref = await addDoc(collection(this.db, 'trips', tripId, 'checkpoints'), { ...cp, updatedAt: serverTimestamp() });
+    const ref = await addDoc(collection(this.db, 'trips', tripId, 'checkpoints'), {
+      ...cp,
+      updatedAt: serverTimestamp(),
+    });
     return { ...cp, id: ref.id, updatedAt: now };
   }
 
-  async addCheckpoints(tripId: string, checkpoints: Omit<Checkpoint, 'id' | 'updatedAt'>[]): Promise<Checkpoint[]> {
+  async addCheckpoints(
+    tripId: string,
+    checkpoints: Omit<Checkpoint, 'id' | 'updatedAt'>[]
+  ): Promise<Checkpoint[]> {
     const now = new Date().toISOString();
     const batch = writeBatch(this.db);
     const collectionRef = collection(this.db, 'trips', tripId, 'checkpoints');
@@ -125,8 +161,15 @@ export class FirebaseClientTripRepository {
     return checkpoints.map((cp, i) => ({ ...cp, id: refs[i].id, updatedAt: now }));
   }
 
-  async updateCheckpoint(tripId: string, id: string, changes: Partial<Omit<Checkpoint, 'id' | 'updatedAt'>>): Promise<void> {
-    await updateDoc(doc(this.db, 'trips', tripId, 'checkpoints', id), { ...changes, updatedAt: serverTimestamp() });
+  async updateCheckpoint(
+    tripId: string,
+    id: string,
+    changes: Partial<Omit<Checkpoint, 'id' | 'updatedAt'>>
+  ): Promise<void> {
+    await updateDoc(doc(this.db, 'trips', tripId, 'checkpoints', id), {
+      ...changes,
+      updatedAt: serverTimestamp(),
+    });
   }
 
   async listAlternatives(tripId: string): Promise<Alternative[]> {
@@ -134,12 +177,30 @@ export class FirebaseClientTripRepository {
     return snap.docs.map((d) => toAlternative(d.id, d.data()));
   }
 
+  // Deduped, sorted union of every tag in use across both checkpoints and
+  // alternatives — backs the list_tags tool so callers can reuse an existing
+  // tag instead of inventing a near-duplicate (e.g. "food" vs "Food").
+  async listTags(tripId: string): Promise<string[]> {
+    const [checkpoints, alternatives] = await Promise.all([
+      this.listCheckpoints(tripId),
+      this.listAlternatives(tripId),
+    ]);
+    const set = new Set<string>();
+    for (const item of [...checkpoints, ...alternatives]) {
+      for (const tag of item.tags ?? []) set.add(tag);
+    }
+    return Array.from(set).sort();
+  }
+
   async addAlternative(tripId: string, alt: Omit<Alternative, 'id'>): Promise<Alternative> {
     const ref = await addDoc(collection(this.db, 'trips', tripId, 'alternatives'), alt);
     return { ...alt, id: ref.id };
   }
 
-  async addAlternatives(tripId: string, alternatives: Omit<Alternative, 'id'>[]): Promise<Alternative[]> {
+  async addAlternatives(
+    tripId: string,
+    alternatives: Omit<Alternative, 'id'>[]
+  ): Promise<Alternative[]> {
     const batch = writeBatch(this.db);
     const collectionRef = collection(this.db, 'trips', tripId, 'alternatives');
     const refs = alternatives.map(() => doc(collectionRef));
@@ -148,11 +209,19 @@ export class FirebaseClientTripRepository {
     return alternatives.map((alt, i) => ({ ...alt, id: refs[i].id }));
   }
 
-  async updateAlternative(tripId: string, id: string, changes: Partial<Omit<Alternative, 'id'>>): Promise<void> {
+  async updateAlternative(
+    tripId: string,
+    id: string,
+    changes: Partial<Omit<Alternative, 'id'>>
+  ): Promise<void> {
     await updateDoc(doc(this.db, 'trips', tripId, 'alternatives', id), { ...changes });
   }
 
-  async promoteAlternative(tripId: string, alternativeId: string, startTime: string): Promise<void> {
+  async promoteAlternative(
+    tripId: string,
+    alternativeId: string,
+    startTime: string
+  ): Promise<void> {
     const altRef = doc(this.db, 'trips', tripId, 'alternatives', alternativeId);
     const altSnap = await getDoc(altRef);
     if (!altSnap.exists()) throw new Error('Alternative not found');
@@ -163,6 +232,7 @@ export class FirebaseClientTripRepository {
       startTime,
       ...(alt.location && { location: alt.location }),
       ...(alt.notes && { notes: alt.notes }),
+      ...(Array.isArray(alt.tags) && alt.tags.length > 0 && { tags: alt.tags }),
       updatedAt: serverTimestamp(),
     });
     // Matches trip-planner's own promoteAlternative (src/data/
@@ -183,7 +253,11 @@ export class FirebaseClientTripRepository {
     return { ...booking, id: ref.id };
   }
 
-  async updateBooking(tripId: string, id: string, changes: Partial<Omit<Booking, 'id'>>): Promise<void> {
+  async updateBooking(
+    tripId: string,
+    id: string,
+    changes: Partial<Omit<Booking, 'id'>>
+  ): Promise<void> {
     await updateDoc(doc(this.db, 'trips', tripId, 'bookings', id), { ...changes });
   }
 }

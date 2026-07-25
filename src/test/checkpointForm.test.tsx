@@ -401,4 +401,64 @@ describe('CheckpointForm', () => {
       if (originalOnLine) Object.defineProperty(navigator, 'onLine', originalOnLine);
     });
   });
+
+  describe('tags', () => {
+    it('pre-fills tags as chips from initial.tags', () => {
+      renderWithProviders(
+        <CheckpointForm
+          initial={{
+            type: 'poi',
+            name: 'Fushimi Inari',
+            startTime: '2026-10-06T08:00:00.000Z',
+            tags: ['must-see', 'outdoors'],
+          }}
+          onSave={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+      expect(screen.getByText('must-see')).toBeInTheDocument();
+      expect(screen.getByText('outdoors')).toBeInTheDocument();
+    });
+
+    it('suggests existingTags in the tags input', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <CheckpointForm onSave={vi.fn()} onCancel={vi.fn()} existingTags={['food', 'rainy-day']} />
+      );
+      await user.click(screen.getByRole('combobox', { name: /tags/i }));
+      expect(screen.getByRole('option', { name: 'food' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'rainy-day' })).toBeInTheDocument();
+    });
+
+    it('includes newly typed tags in onSave, trimmed and deduped', () => {
+      const onSave = vi.fn();
+      renderWithProviders(
+        <CheckpointForm
+          onSave={onSave}
+          onCancel={vi.fn()}
+          defaultStartTime="2026-10-01T14:00:00.000Z"
+        />
+      );
+      fireEvent.change(getNameInput(), { target: { value: 'Tagged Stop' } });
+      const tagsInput = screen.getByRole('combobox', { name: /tags/i });
+      fireEvent.change(tagsInput, { target: { value: '  food  ' } });
+      fireEvent.keyDown(tagsInput, { key: 'Enter' });
+      fireEvent.submit(document.querySelector('form')!);
+      expect(onSave.mock.calls[0][0].tags).toEqual(['food']);
+    });
+
+    it('omits tags entirely when none are entered', () => {
+      const onSave = vi.fn();
+      renderWithProviders(
+        <CheckpointForm
+          onSave={onSave}
+          onCancel={vi.fn()}
+          defaultStartTime="2026-10-01T14:00:00.000Z"
+        />
+      );
+      fireEvent.change(getNameInput(), { target: { value: 'No Tags' } });
+      fireEvent.submit(document.querySelector('form')!);
+      expect(onSave.mock.calls[0][0].tags).toBeUndefined();
+    });
+  });
 });

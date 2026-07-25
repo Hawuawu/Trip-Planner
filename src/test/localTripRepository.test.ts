@@ -336,6 +336,34 @@ describe('LocalTripRepository — alternatives', () => {
       repo.promoteAlternative('t1', 'nonexistent-id', '2026-10-06T10:00:00.000Z')
     ).rejects.toThrow('Alternative not found');
   });
+
+  it('promoteAlternative carries tags through onto the new checkpoint', async () => {
+    const repo = makeRepo();
+    localStorage.setItem('trip-planner:alternatives', JSON.stringify([]));
+    const saved = await repo.addAlternative('t1', {
+      type: 'poi',
+      name: 'Kinkaku-ji',
+      tags: ['must-see', 'outdoors'],
+    });
+
+    const cpCb = vi.fn();
+    repo.subscribeToCheckpoints('t1', cpCb);
+    await repo.promoteAlternative('t1', saved.id, '2026-10-06T10:00:00.000Z');
+
+    const cps = cpCb.mock.calls[cpCb.mock.calls.length - 1][0];
+    const promoted = cps.find((c: { name: string }) => c.name === 'Kinkaku-ji');
+    expect(promoted?.tags).toEqual(['must-see', 'outdoors']);
+  });
+
+  it('updateAlternative merges tags into an existing alternative', async () => {
+    const repo = makeRepo();
+    const saved = await repo.addAlternative('t1', { type: 'poi', name: 'Nishiki Market' });
+    await repo.updateAlternative('t1', saved.id, { tags: ['food'] });
+    const cb = vi.fn();
+    repo.subscribeToAlternatives('t1', cb);
+    const updated = cb.mock.calls[0][0].find((a: { id: string }) => a.id === saved.id);
+    expect(updated?.tags).toEqual(['food']);
+  });
 });
 
 // ── addAlternatives (batch) ──────────────────────────────────────────────────

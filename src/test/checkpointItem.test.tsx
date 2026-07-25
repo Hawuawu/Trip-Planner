@@ -223,4 +223,18 @@ describe('CheckpointItem', () => {
       );
     });
   });
+
+  describe('tags', () => {
+    it('renders a chip for each tag', () => {
+      renderItem({ checkpoint: { ...BASE, tags: ['long-haul', 'jet-lag-risk'] } });
+      expect(screen.getByText('long-haul')).toBeInTheDocument();
+      expect(screen.getByText('jet-lag-risk')).toBeInTheDocument();
+    });
+
+    it('renders no tag chips when tags is absent', () => {
+      const noTags = { ...BASE, tags: undefined };
+      const { container } = renderItem({ checkpoint: noTags });
+      expect(container.querySelectorAll('.MuiChip-root').length).toBe(0);
+    });
+  });
 });

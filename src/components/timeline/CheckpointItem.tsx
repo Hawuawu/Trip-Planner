@@ -10,6 +10,7 @@ import {
   DialogContentText,
   DialogActions,
   Button,
+  Chip,
 } from '@mui/material';
 import {
   TimelineItem,
@@ -23,6 +24,7 @@ import EditIcon from '@mui/icons-material/EditOutlined';
 import TranslateIcon from '@mui/icons-material/TranslateOutlined';
 import type { Checkpoint } from '../../types';
 import { CheckpointIcon } from './CheckpointIcon';
+import { getTagColor } from '../../utils/tagColors';
 import { hasKanji } from '../../utils/kanjiReading';
 import { useKanjiReading } from '../../hooks/useKanjiReading';
 import { InlineReading } from '../InlineReading';
@@ -138,6 +140,26 @@ export function CheckpointItem({
                 {checkpoint.notes}
                 {revealed && notesHasKanji && <InlineReading state={notesReading} />}
               </Typography>
+            )}
+            {checkpoint.tags && checkpoint.tags.length > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                {checkpoint.tags.map((tag) => {
+                  const color = getTagColor(tag);
+                  return (
+                    <Chip
+                      key={tag}
+                      label={tag}
+                      size="small"
+                      sx={{
+                        height: 20,
+                        fontSize: '0.7rem',
+                        bgcolor: color.bg,
+                        color: color.fg,
+                      }}
+                    />
+                  );
+                })}
+              </Box>
             )}
           </Box>
           <Box sx={{ display: 'flex', flexShrink: 0, ml: 1 }}>
