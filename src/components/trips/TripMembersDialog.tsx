@@ -47,6 +47,7 @@ export function TripMembersDialog({
   const [inviting, setInviting] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const isOwner = canManage(trip, currentUid);
 
@@ -79,9 +80,11 @@ export function TripMembersDialog({
     setRemoving(true);
     try {
       await onRemove(removeTarget);
+      setRemoveTarget(null);
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : 'Failed to remove member.');
     } finally {
       setRemoving(false);
-      setRemoveTarget(null);
     }
   }
 
@@ -121,7 +124,10 @@ export function TripMembersDialog({
                         size="small"
                         aria-label={`Remove ${memberLabel(uid)}`}
                         title="Remove member"
-                        onClick={() => setRemoveTarget(uid)}
+                        onClick={() => {
+                          setRemoveError(null);
+                          setRemoveTarget(uid);
+                        }}
                       >
                         <PersonRemoveIcon fontSize="small" />
                       </IconButton>
@@ -188,6 +194,11 @@ export function TripMembersDialog({
           <DialogContentText>
             Remove {removeTarget ? memberLabel(removeTarget) : ''} from this trip?
           </DialogContentText>
+          {removeError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {removeError}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRemoveTarget(null)} disabled={removing}>
