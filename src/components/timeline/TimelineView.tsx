@@ -22,9 +22,14 @@ import { formatDayLabel } from '../../utils/date';
 interface Props {
   openAddSignal?: number;
   onSaved?: (message: string) => void;
+  onError?: (message: string) => void;
 }
 
-export function TimelineView({ openAddSignal, onSaved }: Props) {
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback;
+}
+
+export function TimelineView({ openAddSignal, onSaved, onError }: Props) {
   const theme = useTheme();
   const isPhone = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -129,9 +134,13 @@ export function TimelineView({ openAddSignal, onSaved }: Props) {
       defaultStartTime={defaultStartForInsert(insertAfterIndex)}
       existingTags={allTags}
       onSave={async (data) => {
-        await addCheckpoint(data);
-        setAdding(false);
-        onSaved?.(`Checkpoint "${data.name}" added.`);
+        try {
+          await addCheckpoint(data);
+          setAdding(false);
+          onSaved?.(`Checkpoint "${data.name}" added.`);
+        } catch (err) {
+          onError?.(errorMessage(err, `Failed to add "${data.name}".`));
+        }
       }}
       onCancel={() => setAdding(false)}
     />
@@ -141,9 +150,13 @@ export function TimelineView({ openAddSignal, onSaved }: Props) {
       initial={editing}
       existingTags={allTags}
       onSave={async (data) => {
-        await updateCheckpoint(editing.id, data);
-        setEditingId(null);
-        onSaved?.(`Checkpoint "${data.name}" updated.`);
+        try {
+          await updateCheckpoint(editing.id, data);
+          setEditingId(null);
+          onSaved?.(`Checkpoint "${data.name}" updated.`);
+        } catch (err) {
+          onError?.(errorMessage(err, `Failed to update "${data.name}".`));
+        }
       }}
       onCancel={() => setEditingId(null)}
     />
@@ -214,7 +227,11 @@ export function TimelineView({ openAddSignal, onSaved }: Props) {
                       selectCheckpoint(cp.id);
                       setEditingId(cp.id);
                     }}
-                    onDelete={() => deleteCheckpoint(cp.id)}
+                    onDelete={() =>
+                      deleteCheckpoint(cp.id).catch((err: unknown) =>
+                        onError?.(errorMessage(err, `Failed to delete "${cp.name}".`))
+                      )
+                    }
                   />
                   <Box sx={{ display: 'flex', justifyContent: 'center', my: -1 }}>
                     <IconButton

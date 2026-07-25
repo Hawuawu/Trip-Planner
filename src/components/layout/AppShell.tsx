@@ -198,6 +198,7 @@ export function AppShell({ onBack }: Props) {
   const [routeDialogOpen, setRouteDialogOpen] = useState(false);
   const [dayMenuAnchor, setDayMenuAnchor] = useState<HTMLElement | null>(null);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [errorSnackbar, setErrorSnackbar] = useState<string | null>(null);
   const [addCheckpointSignal, setAddCheckpointSignal] = useState(0);
   const [addAlternativeSignal, setAddAlternativeSignal] = useState(0);
   const [alternativePrefill, setAlternativePrefill] = useState<{
@@ -425,6 +426,7 @@ export function AppShell({ onBack }: Props) {
                 <TimelineView
                   openAddSignal={addCheckpointSignal || undefined}
                   onSaved={setSnackbar}
+                  onError={setErrorSnackbar}
                 />
               </TexturedPanel>
             )}
@@ -435,6 +437,7 @@ export function AppShell({ onBack }: Props) {
                   openAddSignal={addAlternativeSignal || undefined}
                   prefill={alternativePrefill}
                   onSaved={setSnackbar}
+                  onError={setErrorSnackbar}
                 />
               </TexturedPanel>
             )}
@@ -472,6 +475,7 @@ export function AppShell({ onBack }: Props) {
                 <TimelineView
                   openAddSignal={addCheckpointSignal || undefined}
                   onSaved={setSnackbar}
+                  onError={setErrorSnackbar}
                 />
               </TexturedPanel>
             </Box>
@@ -513,6 +517,7 @@ export function AppShell({ onBack }: Props) {
                   openAddSignal={addAlternativeSignal || undefined}
                   prefill={alternativePrefill}
                   onSaved={setSnackbar}
+                  onError={setErrorSnackbar}
                 />
               </TexturedPanel>
             </Box>
@@ -563,6 +568,16 @@ export function AppShell({ onBack }: Props) {
       <Snackbar open={Boolean(snackbar)} autoHideDuration={4000} onClose={() => setSnackbar(null)}>
         <Alert onClose={() => setSnackbar(null)} severity="success" sx={{ width: '100%' }}>
           {snackbar}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={Boolean(errorSnackbar)}
+        autoHideDuration={6000}
+        onClose={() => setErrorSnackbar(null)}
+      >
+        <Alert onClose={() => setErrorSnackbar(null)} severity="error" sx={{ width: '100%' }}>
+          {errorSnackbar}
         </Alert>
       </Snackbar>
     </Box>
