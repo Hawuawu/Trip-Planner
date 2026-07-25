@@ -55,6 +55,13 @@ afterEach(() => {
 });
 
 describe('AlternativesShelf', () => {
+  it('shows a spinner instead of the empty state while alternatives are loading', () => {
+    useTripStore.setState({ alternativesLoading: true });
+    renderWithProviders(<AlternativesShelf />);
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.queryByText(/no alternatives yet/i)).not.toBeInTheDocument();
+  });
+
   // ── Button presence ──────────────────────────────────────────────────────
 
   it('shows exactly one "Add alternative" button when empty, centered in the panel', () => {

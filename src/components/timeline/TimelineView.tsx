@@ -8,6 +8,7 @@ import {
   Drawer,
   useMediaQuery,
   useTheme,
+  CircularProgress,
 } from '@mui/material';
 import { Timeline } from '@mui/lab';
 import AddIcon from '@mui/icons-material/Add';
@@ -35,6 +36,7 @@ export function TimelineView({ openAddSignal, onSaved, onError }: Props) {
 
   const {
     checkpoints,
+    checkpointsLoading,
     alternatives,
     routes,
     selectedDay,
@@ -164,7 +166,18 @@ export function TimelineView({ openAddSignal, onSaved, onError }: Props) {
 
   return (
     <Box sx={{ position: 'relative', height: '100%', overflowY: 'auto' }}>
-      {checkpoints.length === 0 ? (
+      {checkpointsLoading ? (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+          }}
+        >
+          <CircularProgress size={32} />
+        </Box>
+      ) : checkpoints.length === 0 ? (
         <Box
           sx={{
             display: 'flex',

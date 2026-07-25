@@ -189,6 +189,13 @@ describe('AppShell — phone layout', () => {
 });
 
 describe('AppShell — app bar', () => {
+  it('shows a spinner instead of the fallback title while the trip is loading', () => {
+    useTripStore.setState({ tripLoading: true });
+    renderWithProviders(<AppShell onBack={vi.fn()} />);
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.queryByText("Maiyun's Trip Planner")).not.toBeInTheDocument();
+  });
+
   it('falls back to "Maiyun\'s Trip Planner" when no trip is loaded', () => {
     renderWithProviders(<AppShell onBack={vi.fn()} />);
     expect(screen.getByText("Maiyun's Trip Planner")).toBeInTheDocument();

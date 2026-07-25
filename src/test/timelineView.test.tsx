@@ -21,6 +21,15 @@ beforeEach(() => {
   resetStores();
 });
 
+describe('TimelineView — loading state', () => {
+  it('shows a spinner instead of the empty state while checkpoints are loading', () => {
+    useTripStore.setState({ checkpointsLoading: true });
+    renderWithProviders(<TimelineView />);
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.queryByText(/no checkpoints yet/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('TimelineView — empty state', () => {
   it('renders the empty state message when there are no checkpoints', () => {
     renderWithProviders(<TimelineView />);

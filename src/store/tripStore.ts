@@ -24,6 +24,9 @@ interface TripState {
   undoAlternative: Alternative | null;
   repo: TripRepository | null;
   tripId: string | null;
+  tripLoading: boolean;
+  checkpointsLoading: boolean;
+  alternativesLoading: boolean;
 
   init(tripId: string, repo: TripRepository): void;
   selectCheckpoint(id: string | null): void;
@@ -83,12 +86,19 @@ export const useTripStore = create<TripState>((set, get) => ({
   undoAlternative: null,
   repo: null,
   tripId: null,
+  tripLoading: true,
+  checkpointsLoading: true,
+  alternativesLoading: true,
 
   init(tripId, repo) {
-    set({ repo, tripId });
-    repo.subscribeToTrip(tripId, (trip) => set({ trip }));
-    repo.subscribeToCheckpoints(tripId, (checkpoints) => set({ checkpoints }));
-    repo.subscribeToAlternatives(tripId, (alternatives) => set({ alternatives }));
+    set({ repo, tripId, tripLoading: true, checkpointsLoading: true, alternativesLoading: true });
+    repo.subscribeToTrip(tripId, (trip) => set({ trip, tripLoading: false }));
+    repo.subscribeToCheckpoints(tripId, (checkpoints) =>
+      set({ checkpoints, checkpointsLoading: false })
+    );
+    repo.subscribeToAlternatives(tripId, (alternatives) =>
+      set({ alternatives, alternativesLoading: false })
+    );
     repo.subscribeToBookings(tripId, (bookings) => set({ bookings }));
     repo.subscribeToRoutes(tripId, (routes) => set({ routes }));
     repo.subscribeToActivityLog(tripId, (activityLog) => set({ activityLog }));
