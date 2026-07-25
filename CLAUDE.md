@@ -14,7 +14,7 @@ narrow checkpoint timeline paired with a map.
 - Vite + React + TypeScript
 - Zustand for state
 - MUI (`@mui/material`, `@mui/lab` Timeline) for UI
-- Leaflet + OpenStreetMap for the map
+- `maplibre-gl` / `react-map-gl` for the map
 - Firebase: Firestore (data), Auth (Google sign-in, approval-gated — see
   `firestore.rules`'s `hasAppAccess()`), Hosting
 - Installable PWA (`vite-plugin-pwa`)
@@ -46,6 +46,15 @@ this file should ever see a Firestore-specific type. Auth is wrapped the
 same way behind an `AuthService` interface. This exists so the backend can
 be swapped later without touching UI code — don't erode it by reaching for
 `firebase/firestore` from a component "just this once."
+
+## Development standards
+
+TypeScript/React coding conventions, hooks/effects discipline, state
+management patterns, error-handling conventions, testing conventions, git
+& commit conventions, accessibility, performance, security practices, and
+the project's general development philosophy (keep it simple, YAGNI, rule
+of three, etc.) live in `STANDARDS.md` — read it before writing or
+reviewing non-trivial code changes.
 
 ## Data model (Firestore)
 
