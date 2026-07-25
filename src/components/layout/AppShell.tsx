@@ -18,6 +18,7 @@ import {
   Snackbar,
   Alert,
   Button,
+  CircularProgress,
 } from '@mui/material';
 import ViewTimelineIcon from '@mui/icons-material/ViewTimeline';
 import MapIcon from '@mui/icons-material/Map';
@@ -182,6 +183,7 @@ export function AppShell({ onBack }: Props) {
   const [showTimeline, setShowTimeline] = useState(true);
   const [showAlternatives, setShowAlternatives] = useState(true);
   const trip = useTripStore((s) => s.trip);
+  const tripLoading = useTripStore((s) => s.tripLoading);
   const checkpoints = useTripStore((s) => s.checkpoints);
   const alternatives = useTripStore((s) => s.alternatives);
   const activityLog = useTripStore((s) => s.activityLog);
@@ -289,8 +291,12 @@ export function AppShell({ onBack }: Props) {
             alt=""
             sx={{ width: 32, height: 32, borderRadius: 0, mr: 1.5, objectFit: 'cover' }}
           />
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            {trip?.name ?? "Maiyun's Trip Planner"}
+          <Typography variant="h6" sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
+            {tripLoading ? (
+              <CircularProgress size={16} sx={{ color: 'inherit' }} />
+            ) : (
+              (trip?.name ?? "Maiyun's Trip Planner")
+            )}
           </Typography>
 
           <Drawer anchor="left" open={menuOpen} onClose={() => setMenuOpen(false)}>

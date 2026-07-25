@@ -13,6 +13,7 @@ import {
   Snackbar,
   useMediaQuery,
   useTheme,
+  CircularProgress,
 } from '@mui/material';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import { useTripStore } from '../../store/tripStore';
@@ -72,6 +73,7 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
   const {
     checkpoints,
     alternatives,
+    alternativesLoading,
     addAlternative,
     updateAlternative,
     deleteAlternative,
@@ -185,7 +187,18 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
-      {alternatives.length === 0 ? (
+      {alternativesLoading ? (
+        <Box
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <CircularProgress size={32} />
+        </Box>
+      ) : alternatives.length === 0 ? (
         <Box
           sx={{
             flex: 1,

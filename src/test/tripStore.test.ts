@@ -108,6 +108,55 @@ describe('tripStore — init', () => {
     expect(tripId).toBe('trip-1');
     expect(storedRepo).toBe(repo);
   });
+
+  it('sets tripLoading, checkpointsLoading, alternativesLoading to true immediately on init', () => {
+    const repo = makeMockRepo();
+    useTripStore.getState().init('trip-1', repo);
+    const { tripLoading, checkpointsLoading, alternativesLoading } = useTripStore.getState();
+    expect(tripLoading).toBe(true);
+    expect(checkpointsLoading).toBe(true);
+    expect(alternativesLoading).toBe(true);
+  });
+
+  it('flips each loading flag independently as its subscription callback fires', () => {
+    let tripCb: (t: Trip) => void = () => {};
+    let checkpointsCb: (c: Checkpoint[]) => void = () => {};
+    const repo = makeMockRepo({
+      subscribeToTrip: vi.fn((_id, cb) => {
+        tripCb = cb;
+        return () => {};
+      }),
+      subscribeToCheckpoints: vi.fn((_id, cb) => {
+        checkpointsCb = cb;
+        return () => {};
+      }),
+    });
+    useTripStore.getState().init('trip-1', repo);
+
+    tripCb(TRIP);
+    expect(useTripStore.getState().tripLoading).toBe(false);
+    expect(useTripStore.getState().checkpointsLoading).toBe(true);
+
+    checkpointsCb([]);
+    expect(useTripStore.getState().checkpointsLoading).toBe(false);
+  });
+
+  it('resets all three loading flags to true when init is called again for a new trip', () => {
+    const repo1 = makeMockRepo({
+      subscribeToTrip: vi.fn((_id, cb) => {
+        cb(TRIP);
+        return () => {};
+      }),
+    });
+    useTripStore.getState().init('trip-1', repo1);
+    expect(useTripStore.getState().tripLoading).toBe(false);
+
+    const repo2 = makeMockRepo();
+    useTripStore.getState().init('trip-2', repo2);
+    expect(useTripStore.getState().tripLoading).toBe(true);
+    expect(useTripStore.getState().checkpointsLoading).toBe(true);
+    expect(useTripStore.getState().alternativesLoading).toBe(true);
+  });
 });
 
 describe('tripStore — membership', () => {
