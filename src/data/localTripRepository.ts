@@ -411,6 +411,7 @@ export class LocalTripRepository implements TripRepository {
       startTime,
       location: alt.location,
       notes: alt.notes,
+      websiteUrl: alt.websiteUrl,
     });
     await this.deleteAlternative(tripId, alternativeId);
     this.pushActivity(tripId, { type: 'alternative_promoted', entityName: alt.name });
