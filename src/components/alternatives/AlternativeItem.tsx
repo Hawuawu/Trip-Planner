@@ -22,15 +22,17 @@ import { MarkdownNotes } from '../shared/MarkdownNotes';
 interface Props {
   alternative: Alternative;
   onSelect(): void;
+  onEdit(): void;
   onPromote(): void;
   onDelete(): void;
 }
 
-export function AlternativeItem({ alternative, onSelect, onPromote, onDelete }: Props) {
+export function AlternativeItem({ alternative, onSelect, onEdit, onPromote, onDelete }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
     <Box
+      onClick={onSelect}
       sx={{
         display: 'flex',
         alignItems: 'flex-start',
@@ -43,13 +45,14 @@ export function AlternativeItem({ alternative, onSelect, onPromote, onDelete }: 
         px: 1.5,
         py: 1,
         mb: 1,
+        cursor: 'pointer',
       }}
     >
       <Box sx={{ display: 'flex', gap: 1, minWidth: 0 }}>
         <Box
           onClick={(e) => {
             e.stopPropagation();
-            onSelect();
+            onEdit();
           }}
           role="button"
           aria-label="Edit alternative"
@@ -110,7 +113,7 @@ export function AlternativeItem({ alternative, onSelect, onPromote, onDelete }: 
           aria-label="Edit alternative"
           onClick={(e) => {
             e.stopPropagation();
-            onSelect();
+            onEdit();
           }}
         >
           <EditIcon fontSize="small" />

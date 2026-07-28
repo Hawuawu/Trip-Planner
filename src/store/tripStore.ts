@@ -20,6 +20,10 @@ interface TripState {
   selectedId: string | null;
   selectedDay: string | null;
   selectedRouteId: string | null;
+  selectedAlternativeId: string | null;
+  alternativesSearchFilter: string;
+  alternativesTagFilter: string[];
+  showAlternativesOnMap: boolean;
   undoCheckpoint: Checkpoint | null;
   undoAlternative: Alternative | null;
   repo: TripRepository | null;
@@ -32,6 +36,10 @@ interface TripState {
   selectCheckpoint(id: string | null): void;
   selectDay(day: string | null): void;
   selectRoute(routeId: string | null): void;
+  selectAlternative(id: string | null): void;
+  setAlternativesSearchFilter(search: string): void;
+  toggleAlternativesTagFilter(tag: string): void;
+  setShowAlternativesOnMap(value: boolean): void;
 
   inviteMember(email: string): Promise<InviteMemberResult>;
   removeMember(uid: string): Promise<void>;
@@ -82,6 +90,10 @@ export const useTripStore = create<TripState>((set, get) => ({
   selectedId: null,
   selectedDay: null,
   selectedRouteId: null,
+  selectedAlternativeId: null,
+  alternativesSearchFilter: '',
+  alternativesTagFilter: [],
+  showAlternativesOnMap: true,
   undoCheckpoint: null,
   undoAlternative: null,
   repo: null,
@@ -135,12 +147,34 @@ export const useTripStore = create<TripState>((set, get) => ({
     set({ selectedId: selectedId === id ? null : id });
   },
 
+  selectAlternative(id) {
+    const { selectedAlternativeId } = get();
+    set({ selectedAlternativeId: selectedAlternativeId === id ? null : id });
+  },
+
   selectDay(day) {
     set({ selectedDay: day });
   },
 
   selectRoute(routeId) {
     set({ selectedRouteId: routeId });
+  },
+
+  setAlternativesSearchFilter(search) {
+    set({ alternativesSearchFilter: search });
+  },
+
+  toggleAlternativesTagFilter(tag) {
+    const { alternativesTagFilter } = get();
+    set({
+      alternativesTagFilter: alternativesTagFilter.includes(tag)
+        ? alternativesTagFilter.filter((t) => t !== tag)
+        : [...alternativesTagFilter, tag],
+    });
+  },
+
+  setShowAlternativesOnMap(value) {
+    set({ showAlternativesOnMap: value });
   },
 
   async addCheckpoint(cp) {
