@@ -20,7 +20,8 @@ import { useTripStore } from '../../store/tripStore';
 import { AlternativeItem } from './AlternativeItem';
 import { AlternativeForm } from './AlternativeForm';
 import { ListControls } from '../shared/ListControls';
-import { collectAllTags, matchesAnyTag } from '../../utils/tags';
+import { collectAllTags } from '../../utils/tags';
+import { filterAlternatives } from '../../utils/alternativesFilter';
 import type { Alternative } from '../../types';
 
 interface Props {
@@ -81,10 +82,13 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
     undoAlternative,
     undoDeleteAlternative,
     clearUndoAlternative,
+    alternativesSearchFilter: search,
+    alternativesTagFilter: selectedTags,
+    setAlternativesSearchFilter,
+    toggleAlternativesTagFilter,
+    selectAlternative,
   } = useTripStore();
 
-  const [search, setSearch] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortBy>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [promoteId, setPromoteId] = useState<string | null>(null);
@@ -114,25 +118,15 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
     [checkpoints, alternatives]
   );
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return alternatives.filter((a) => {
-      const matchesSearch =
-        !q || [a.name, a.location?.label, a.notes].some((f) => f?.toLowerCase().includes(q));
-      return matchesSearch && matchesAnyTag(a.tags, selectedTags);
-    });
-  }, [alternatives, search, selectedTags]);
+  const filtered = useMemo(
+    () => filterAlternatives(alternatives, { search, tags: selectedTags }),
+    [alternatives, search, selectedTags]
+  );
 
   const sorted = useMemo(
     () => [...filtered].sort((a, b) => compareAlternatives(a, b, sortBy, sortDir)),
     [filtered, sortBy, sortDir]
   );
-
-  function toggleTag(tag: string) {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  }
 
   function handleSortChange(e: React.ChangeEvent<HTMLInputElement>) {
     const [by, dir] = (e.target.value as SortOption).split('-') as [SortBy, SortDir];
@@ -227,11 +221,11 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
         <>
           <ListControls
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={setAlternativesSearchFilter}
             searchPlaceholder="Search alternatives…"
             allTags={allTags}
             selectedTags={selectedTags}
-            onToggleTag={toggleTag}
+            onToggleTag={toggleAlternativesTagFilter}
             extraControls={
               <TextField
                 select
@@ -264,7 +258,11 @@ export function AlternativesShelf({ openAddSignal, prefill, onSaved, onError }: 
                 <AlternativeItem
                   key={alt.id}
                   alternative={alt}
-                  onSelect={() => setEditingId(alt.id)}
+                  onSelect={() => selectAlternative(alt.id)}
+                  onEdit={() => {
+                    selectAlternative(alt.id);
+                    setEditingId(alt.id);
+                  }}
                   onPromote={() => setPromoteId(alt.id)}
                   onDelete={() =>
                     deleteAlternative(alt.id).catch((err: unknown) =>
