@@ -10,16 +10,20 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  Switch,
   Typography,
 } from '@mui/material';
 import LayersIcon from '@mui/icons-material/Layers';
 import { useTripStore } from '../../store/tripStore';
 import { CheckpointMarker } from './CheckpointMarker';
+import { AlternativeMarker } from './AlternativeMarker';
 import { MapZoomControl } from './MapZoomControl';
 import { MapOrientationBall } from './MapOrientationBall';
-import { MAX_PITCH } from './mapConstants';
+import { MAX_PITCH, FOCUS_ZOOM } from './mapConstants';
+import type { Alternative } from '../../types';
 import { getPoiAtPoint, type Poi } from './poi';
 import { visibleCheckpoints } from '../../utils/checkpointVisibility';
+import { filterAlternatives } from '../../utils/alternativesFilter';
 
 const JAPAN_CENTER = { longitude: 139.69, latitude: 35.68, zoom: 10 };
 
@@ -44,9 +48,13 @@ const ROUTE_LAYER: LineLayerSpecification = {
 function StyleSwitcher({
   current,
   onChange,
+  showAlternatives,
+  onToggleAlternatives,
 }: {
   current: string;
   onChange: (url: string) => void;
+  showAlternatives: boolean;
+  onToggleAlternatives: (checked: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -96,6 +104,17 @@ function StyleSwitcher({
               />
             ))}
           </RadioGroup>
+          <FormControlLabel
+            control={
+              <Switch
+                size="small"
+                checked={showAlternatives}
+                onChange={(e) => onToggleAlternatives(e.target.checked)}
+              />
+            }
+            label={<Typography variant="body2">Show alternatives</Typography>}
+            sx={{ mx: 0, my: -0.25 }}
+          />
         </Paper>
       )}
     </Box>
@@ -104,15 +123,33 @@ function StyleSwitcher({
 
 function MapSync() {
   const { current: map } = useMap();
-  const { checkpoints, selectedId } = useTripStore();
+  const { checkpoints, selectedId, alternatives, selectedAlternativeId } = useTripStore();
 
   useEffect(() => {
     if (!map) return;
     const selected = checkpoints.find((c) => c.id === selectedId && c.location);
     if (selected?.location) {
-      map.easeTo({ center: [selected.location.lng, selected.location.lat], duration: 300 });
+      map.easeTo({
+        center: [selected.location.lng, selected.location.lat],
+        zoom: Math.max(map.getZoom(), FOCUS_ZOOM),
+        duration: 300,
+      });
     }
   }, [selectedId, checkpoints, map]);
+
+  useEffect(() => {
+    if (!map) return;
+    const selected = alternatives.find(
+      (a: Alternative) => a.id === selectedAlternativeId && a.location
+    );
+    if (selected?.location) {
+      map.easeTo({
+        center: [selected.location.lng, selected.location.lat],
+        zoom: Math.max(map.getZoom(), FOCUS_ZOOM),
+        duration: 300,
+      });
+    }
+  }, [selectedAlternativeId, alternatives, map]);
 
   return null;
 }
@@ -123,11 +160,27 @@ interface Props {
 
 export function MapView({ onPoiSelected }: Props) {
   const [mapStyle, setMapStyle] = useState<string>(STYLES[0].url);
-  const { checkpoints, selectedId, selectCheckpoint, selectedDay, selectedRouteId, routes } =
-    useTripStore();
+  const {
+    checkpoints,
+    alternatives,
+    alternativesSearchFilter,
+    alternativesTagFilter,
+    showAlternativesOnMap,
+    setShowAlternativesOnMap,
+    selectedId,
+    selectCheckpoint,
+    selectedDay,
+    selectedRouteId,
+    routes,
+  } = useTripStore();
 
   const visible = visibleCheckpoints(checkpoints, { selectedDay, selectedRouteId, routes });
   const withLocation = visible.filter((c) => c.location);
+
+  const visibleAlternatives = filterAlternatives(alternatives, {
+    search: alternativesSearchFilter,
+    tags: alternativesTagFilter,
+  }).filter((a) => a.location);
 
   const routeGeoJSON: FeatureCollection<LineString> = {
     type: 'FeatureCollection',
@@ -158,7 +211,12 @@ export function MapView({ onPoiSelected }: Props) {
       }}
       style={{ width: '100%', height: '100%' }}
     >
-      <StyleSwitcher current={mapStyle} onChange={setMapStyle} />
+      <StyleSwitcher
+        current={mapStyle}
+        onChange={setMapStyle}
+        showAlternatives={showAlternativesOnMap}
+        onToggleAlternatives={setShowAlternativesOnMap}
+      />
       <MapSync />
       <AttributionControl position="top-right" compact />
 
@@ -190,6 +248,9 @@ export function MapView({ onPoiSelected }: Props) {
           onSelect={() => selectCheckpoint(cp.id === selectedId ? null : cp.id)}
         />
       ))}
+
+      {showAlternativesOnMap &&
+        visibleAlternatives.map((alt) => <AlternativeMarker key={alt.id} alternative={alt} />)}
     </Map>
   );
 }

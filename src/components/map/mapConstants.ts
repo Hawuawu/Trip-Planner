@@ -1,5 +1,10 @@
 export const ZOOM_DURATION_MS = 220;
 
+// Zoom level a checkpoint/alternative is focused to when selected — close
+// enough to distinguish a single POI, but selection only zooms in to reach
+// it, never zooms a closer-in view back out.
+export const FOCUS_ZOOM = 15;
+
 // MapLibre's own engine default and the point past which it calls pitch
 // "experimental" — shared by <Map maxPitch> and the orientation ball's clamp
 // so native gestures and the ball control can never drift out of sync.

@@ -38,6 +38,9 @@ beforeEach(() => {
     checkpoints: [],
     alternatives: [],
     selectedId: null,
+    selectedAlternativeId: null,
+    alternativesSearchFilter: '',
+    alternativesTagFilter: [],
     undoCheckpoint: null,
     undoAlternative: null,
     repo: null,
@@ -227,6 +230,29 @@ describe('AlternativesShelf', () => {
 
     expect(screen.getByRole('heading', { name: /edit alternative/i })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /name/i })).toHaveValue('teamLab Borderless');
+  });
+
+  it('selects the alternative (for map focus) when it is edited', async () => {
+    useTripStore.setState({ alternatives: SEED_ALTS });
+    renderWithProviders(<AlternativesShelf />);
+
+    await userEvent.click(
+      within(itemContainer('teamLab Borderless')).getAllByRole('button', {
+        name: /edit alternative/i,
+      })[0]
+    );
+
+    expect(useTripStore.getState().selectedAlternativeId).toBe('a1');
+  });
+
+  it('selects the alternative for map focus when the card is clicked, without opening the edit form', async () => {
+    useTripStore.setState({ alternatives: SEED_ALTS });
+    renderWithProviders(<AlternativesShelf />);
+
+    await userEvent.click(screen.getByText('teamLab Borderless'));
+
+    expect(useTripStore.getState().selectedAlternativeId).toBe('a1');
+    expect(screen.queryByRole('heading', { name: /edit alternative/i })).not.toBeInTheDocument();
   });
 
   it('calls updateAlternative with edited values on save', async () => {

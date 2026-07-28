@@ -3,7 +3,7 @@ import { screen, fireEvent } from '@testing-library/react';
 import { MapView } from './MapView';
 import { renderWithProviders, resetStores } from '../../test/helpers';
 import { useTripStore } from '../../store/tripStore';
-import type { Checkpoint } from '../../types';
+import type { Checkpoint, Alternative } from '../../types';
 import { getPoiAtPoint } from './poi';
 
 const mockedGetPoiAtPoint = vi.mocked(getPoiAtPoint);
@@ -12,6 +12,7 @@ const easeTo = vi.fn();
 const jumpTo = vi.fn();
 const zoomIn = vi.fn();
 const zoomOut = vi.fn();
+const getZoom = vi.fn(() => 10);
 
 vi.mock('./poi', () => ({ getPoiAtPoint: vi.fn() }));
 
@@ -38,7 +39,7 @@ vi.mock('react-map-gl/maplibre', () => ({
     </button>
   ),
   Popup: ({ children }: { children: React.ReactNode }) => <div data-testid="popup">{children}</div>,
-  useMap: () => ({ current: { easeTo, jumpTo, zoomIn, zoomOut } }),
+  useMap: () => ({ current: { easeTo, jumpTo, zoomIn, zoomOut, getZoom } }),
 }));
 
 function makeCheckpoint(overrides: Partial<Checkpoint> = {}): Checkpoint {
@@ -59,6 +60,7 @@ beforeEach(() => {
   jumpTo.mockClear();
   zoomIn.mockClear();
   zoomOut.mockClear();
+  getZoom.mockClear();
   mockedGetPoiAtPoint.mockReset();
 });
 
@@ -107,7 +109,7 @@ describe('MapView', () => {
     });
 
     renderWithProviders(<MapView />);
-    expect(easeTo).toHaveBeenCalledWith({ center: [135.77, 34.9], duration: 300 });
+    expect(easeTo).toHaveBeenCalledWith({ center: [135.77, 34.9], zoom: 15, duration: 300 });
   });
 
   it('does not ease the map when no checkpoint is selected', () => {
@@ -200,6 +202,108 @@ describe('MapView', () => {
       });
       renderWithProviders(<MapView />);
       expect(screen.getAllByTestId('marker')).toHaveLength(2);
+    });
+  });
+
+  describe('alternatives layer', () => {
+    function makeAlternative(overrides: Partial<Alternative> = {}): Alternative {
+      return {
+        id: 'alt-1',
+        type: 'poi',
+        name: 'Backup Shrine',
+        location: { lat: 34.9, lng: 135.77 },
+        ...overrides,
+      };
+    }
+
+    it('renders the "Show alternatives" switch checked by default', () => {
+      renderWithProviders(<MapView />);
+      fireEvent.click(screen.getByLabelText('Toggle layer selector'));
+      expect(screen.getByRole('checkbox', { name: /show alternatives/i })).toBeChecked();
+    });
+
+    it('renders alternative markers by default', () => {
+      useTripStore.setState({ alternatives: [makeAlternative()] });
+      renderWithProviders(<MapView />);
+      expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    });
+
+    it('hides alternative markers when the switch is toggled off, and shows them again when toggled back on', () => {
+      useTripStore.setState({ alternatives: [makeAlternative()] });
+      renderWithProviders(<MapView />);
+      expect(screen.getAllByTestId('marker')).toHaveLength(1);
+
+      fireEvent.click(screen.getByLabelText('Toggle layer selector'));
+      fireEvent.click(screen.getByRole('checkbox', { name: /show alternatives/i }));
+      expect(screen.queryAllByTestId('marker')).toHaveLength(0);
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /show alternatives/i }));
+      expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    });
+
+    it('remembers the switch state across remounts (store-backed, not component-local)', () => {
+      const { unmount } = renderWithProviders(<MapView />);
+      fireEvent.click(screen.getByLabelText('Toggle layer selector'));
+      fireEvent.click(screen.getByRole('checkbox', { name: /show alternatives/i }));
+      expect(useTripStore.getState().showAlternativesOnMap).toBe(false);
+      unmount();
+
+      renderWithProviders(<MapView />);
+      fireEvent.click(screen.getByLabelText('Toggle layer selector'));
+      expect(screen.getByRole('checkbox', { name: /show alternatives/i })).not.toBeChecked();
+    });
+
+    it('skips alternatives without a location', () => {
+      useTripStore.setState({
+        alternatives: [
+          makeAlternative({ id: 'a' }),
+          makeAlternative({ id: 'b', location: undefined }),
+        ],
+      });
+      renderWithProviders(<MapView />);
+      expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    });
+
+    it('narrows rendered alternatives to match the store search/tag filter', () => {
+      useTripStore.setState({
+        alternatives: [
+          makeAlternative({ id: 'a', name: 'Backup Shrine' }),
+          makeAlternative({ id: 'b', name: 'Other Spot' }),
+        ],
+        alternativesSearchFilter: 'shrine',
+      });
+      renderWithProviders(<MapView />);
+      expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    });
+
+    it('eases and zooms the map to the selected alternative location', () => {
+      useTripStore.setState({
+        alternatives: [makeAlternative({ id: 'alt-1', location: { lat: 35.0, lng: 135.75 } })],
+        selectedAlternativeId: 'alt-1',
+      });
+
+      renderWithProviders(<MapView />);
+      expect(easeTo).toHaveBeenCalledWith({ center: [135.75, 35.0], zoom: 15, duration: 300 });
+    });
+
+    it('does not ease the map when no alternative is selected', () => {
+      useTripStore.setState({
+        alternatives: [makeAlternative()],
+        selectedAlternativeId: null,
+      });
+      renderWithProviders(<MapView />);
+      expect(easeTo).not.toHaveBeenCalled();
+    });
+
+    it('does not zoom out when already zoomed in past the focus level', () => {
+      getZoom.mockReturnValue(18);
+      useTripStore.setState({
+        checkpoints: [makeCheckpoint({ id: 'a', location: { lat: 34.9, lng: 135.77 } })],
+        selectedId: 'a',
+      });
+
+      renderWithProviders(<MapView />);
+      expect(easeTo).toHaveBeenCalledWith({ center: [135.77, 34.9], zoom: 18, duration: 300 });
     });
   });
 });
